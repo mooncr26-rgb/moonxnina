@@ -2,7 +2,6 @@ import os
 import threading
 import uuid
 import requests
-import re
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import yt_dlp
@@ -15,39 +14,56 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 
 download_tasks = {}
 
-# YouTube ალტერნატივები
-INVIDIOUS_INSTANCES = [
-    "https://invidious.io.lol",
-    "https://yewtu.be",
-    "https://iv.melmac.space"
-]
-
 def get_clean_youtube_id(url):
     if "youtu.be/" in url: return url.split("youtu.be/")[-1].split("?")[0]
     if "v=" in url: return url.split("v=")[-1].split("&")[0]
     return None
 
 def download_tiktok_fallback(url, local_filename):
-    """ ალტერნატიული გზა ტიკტოკის ბლოკის ასავლელად (TikWM API) """
     try:
         api_url = "https://www.tikwm.com/api/"
         res = requests.post(api_url, data={'url': url}).json()
         if res.get('code') == 0:
-            video_url = res['data']['play'] # ვიდეო ლოგოს (Watermark) გარეშე!
+            video_url = res['data']['play']
             video_bytes = requests.get(video_url, timeout=30).content
             with open(local_filename, 'wb') as f:
                 f.write(video_bytes)
             return res['data'].get('title', 'TikTok_Video')
     except Exception as e:
-        print(f"TikTok Fallback Error: {e}")
+        print(f"TikTok Error: {e}")
     return None
+
+def download_youtube_fallback(yt_id, file_type, local_filename):
+    """ YouTube-ის ალტერნატიული დაზღვეული ჩამოტვირთვა Cobalt API-ს გამოყენებით """
+    try:
+        # Cobalt არის საუკეთესო დაუბლოკავი API მედიის გადმოსაწერად
+        api_url = "https://api.cobalt.tools/"
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "url": f"https://www.youtube.com/watch?v={yt_id}",
+            "videoQuality": "720",
+            "downloadMode": "audio" if file_type == "mp3" else "regular"
+        }
+        
+        res = requests.post(api_url, json=payload, headers=headers, timeout=20).json()
+        if "url" in res:
+            file_bytes = requests.get(res["url"], timeout=60).content
+            with open(local_filename, 'wb') as f:
+                f.write(file_bytes)
+            return True
+    except Exception as e:
+        print(f"Cobalt API Error: {e}")
+    return False
 
 def background_download(url, file_type, task_id):
     try:
         ext = "mp3" if file_type == 'mp3' else "mp4"
         local_filename = os.path.join(TEMP_DIR, f"{task_id}.{ext}")
         
-        # 👑 თუ ლინკი ტიკტოკისაა, პირდაპირ ვიყენებთ დაზღვეულ API-ს
+        # 1. ტიკტოკის შემთხვევა
         if "tiktok.com" in url:
             title = download_tiktok_fallback(url, local_filename)
             if title:
@@ -56,20 +72,21 @@ def background_download(url, file_type, task_id):
                 download_tasks[task_id]['title'] = title
                 return
             else:
-                raise Exception("ტიკტოკის სერვერმა უარი თქვა ფაილის მოცემაზე.")
+                raise Exception("TikTok-ის გადმოწერა ვერ მოხერხდა.")
 
-        # 🎥 სხვა პლატფორმებისთვის (YouTube და ა.შ.) ძველი ლოგიკა yt-dlp-ით
+        # 2. YouTube-ის შემთხვევა
+        yt_id = get_clean_youtube_id(url)
+        
+        # ვცდილობთ ჯერ სტანდარტული გზით
         opts = {
             'quiet': True,
             'nocheckcertificate': True,
             'outtmpl': os.path.join(TEMP_DIR, f"{task_id}.%(ext)s"),
             'format': 'bestaudio/best' if file_type == 'mp3' else 'best[ext=mp4]/best'
         }
-        
         ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
         if os.path.exists(os.path.join(ffmpeg_path, 'ffmpeg')):
             opts['ffmpeg_location'] = ffmpeg_path
-            
         if file_type == 'mp3':
             opts['postprocessors'] = [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '320'}]
 
@@ -84,26 +101,19 @@ def background_download(url, file_type, task_id):
                 download_tasks[task_id]['title'] = info.get('title', 'Downloaded_Media')
                 return
         except Exception as ydl_err:
-            # YouTube-ის გადაზღვევა
-            yt_id = get_clean_youtube_id(url)
+            # თუ დაბლოკა სტანდარტულმა, გადადის Cobalt API-ზე (ეს აუცილებლად გადმოწერს რეალურ ფაილს!)
             if yt_id:
-                for instance in INVIDIOUS_INSTANCES:
-                    try:
-                        inv_url = f"{instance}/latest_version?id={yt_id}&itype=mp4" if file_type == 'mp4' else f"{instance}/latest_version?id={yt_id}&itype=audio"
-                        response = requests.get(inv_url, stream=True, timeout=30)
-                        if response.status_code == 200:
-                            with open(local_filename, 'wb') as f:
-                                for chunk in response.iter_content(chunk_size=8192): f.write(chunk)
-                            download_tasks[task_id]['status'] = 'completed'
-                            download_tasks[task_id]['filename'] = local_filename
-                            download_tasks[task_id]['title'] = f"YouTube_{yt_id}"
-                            return
-                    except: continue
+                success = download_youtube_fallback(yt_id, file_type, local_filename)
+                if success:
+                    download_tasks[task_id]['status'] = 'completed'
+                    download_tasks[task_id]['filename'] = local_filename
+                    download_tasks[task_id]['title'] = f"YouTube_{yt_id}"
+                    return
             raise ydl_err
 
     except Exception as e:
         download_tasks[task_id]['status'] = 'failed'
-        download_tasks[task_id]['error'] = str(e)
+        download_tasks[task_id]['error'] = "სერვერმა უარი თქვა ფაილის დამუშავებაზე. სცადეთ სხვა ლინკი."
 
 @app.route('/')
 def index():
@@ -115,13 +125,10 @@ def analyze_video():
     url = data.get('url', '')
     if not url: return jsonify({"error": "ბმული აკლია"}), 400
     
-    if "tiktok.com" in url:
-        return jsonify({"title": "TikTok ვიდეო (Watermark-ის გარეშე)"})
-    
+    if "tiktok.com" in url: return jsonify({"title": "TikTok ვიდეო"})
     yt_id = get_clean_youtube_id(url)
     if yt_id: return jsonify({"title": f"YouTube ვიდეო ({yt_id})"})
-        
-    return jsonify({"title": "მედია ფაილი მზად არის გადმოსაწერად"})
+    return jsonify({"title": "მედია ფაილი"})
 
 @app.route('/api/download', methods=['POST'])
 def start_download():
@@ -147,7 +154,6 @@ def get_file(task_id):
     task = download_tasks.get(task_id)
     if not task or task['status'] != 'completed': return "არ არის მზად", 400
     
-    # ფაილის უსაფრთხო დასახელება ჩამოსატვირთად
     safe_title = "".join([c for c in task['title'] if c.isalpha() or c.isdigit() or c==' ']).rstrip()
     ext = task['filename'].split('.')[-1]
     download_name = f"{safe_title or 'media'}.{ext}"
