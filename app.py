@@ -33,52 +33,65 @@ def download_tiktok_fallback(url, local_filename):
         print(f"TikTok Error: {e}")
     return None
 
-def download_youtube_embed_fallback(yt_id, file_type, local_filename):
+def download_youtube_ultimate_fallback(yt_id, file_type, local_filename):
     """ 
-    YouTube-ის 100%-ით დაზღვეული ჩამოტვირთვა საჯარო მედია კონვერტაციის სერვერით, 
-    რომელსაც YouTube ვერასოდეს ბლოკავს.
+    YouTube-ის ჩამოტვირთვის უახლესი გზა Piped API-სა და მრავალმხრივი გეითვეების გამოყენებით.
     """
+    # 1. ვცდილობთ Piped API-ს (ეს არის ყველაზე სტაბილური ამჟამად)
     try:
-        # ვიყენებთ მყარ საჯარო სერვისს, რომელიც პირდაპირ streams არხებს იყენებს
-        gateways = [
-            f"https://co.wuk.sh/api/json",
-            f"https://api.cobalt.tools/"
-        ]
+        piped_res = requests.get(f"https://pipedapi.kavin.rocks/streams/{yt_id}", timeout=15).json()
         
-        payload = {
-            "url": f"https://www.youtube.com/watch?v={yt_id}",
-            "videoQuality": "720",
-            "downloadMode": "audio" if file_type == "mp3" else "regular"
-        }
-        
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-        }
-
-        for api_url in gateways:
-            try:
-                res = requests.post(api_url, json=payload, headers=headers, timeout=15).json()
-                file_url = res.get("url")
-                if file_url:
-                    file_bytes = requests.get(file_url, timeout=60).content
-                    with open(local_filename, 'wb') as f:
-                        f.write(file_bytes)
+        if file_type == "mp4" and "videoStreams" in piped_res:
+            # ვეძებთ სასურველ ვიდეო სტრიმს, რომელსაც ხმაც მოჰყვება
+            streams = [s for s in piped_res["videoStreams"] if s.get("videoOnly") is False]
+            if not streams: streams = piped_res["videoStreams"]
+            if streams:
+                video_url = streams[0]["url"]
+                r = requests.get(video_url, timeout=60)
+                if r.status_code == 200:
+                    with open(local_filename, 'wb') as f: f.write(r.content)
                     return True
-            except:
-                continue
-                
-        # თუ ზედა სერვერები გადაიტვირთა, ვიყენებთ პირდაპირ open-stream ალტერნატივას
-        fallback_url = f"https://www.youtubeinmp4.com/redirect.php?video={yt_id}" if file_type == "mp4" else f"https://www.youtubeinmp3.com/fetch/?video=https://www.youtube.com/watch?v={yt_id}"
-        r = requests.get(fallback_url, timeout=30, stream=True)
-        if r.status_code == 200:
-            with open(local_filename, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192): f.write(chunk)
-            return True
-            
+                    
+        elif file_type == "mp3" and "audioStreams" in piped_res:
+            audio_url = piped_res["audioStreams"][0]["url"]
+            r = requests.get(audio_url, timeout=60)
+            if r.status_code == 200:
+                with open(local_filename, 'wb') as f: f.write(r.content)
+                return True
     except Exception as e:
-        print(f"Embed Fallback Error: {e}")
+        print(f"Piped API failed: {e}")
+
+    # 2. თუ Piped-მა უარი თქვა, გადავდივართ მყარ ალტერნატიულ დამუშავებაზე (Cobalt/Wuk API-ების გაფართოებული სია)
+    gateways = [
+        "https://co.wuk.sh/api/json",
+        "https://api.cobalt.tools/",
+        "https://cobalt.moe/api/json"
+    ]
+    
+    payload = {
+        "url": f"https://www.youtube.com/watch?v={yt_id}",
+        "videoQuality": "720",
+        "downloadMode": "audio" if file_type == "mp3" else "regular"
+    }
+    
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    for api_url in gateways:
+        try:
+            res = requests.post(api_url, json=payload, headers=headers, timeout=12).json()
+            file_url = res.get("url")
+            if file_url:
+                r = requests.get(file_url, timeout=60)
+                if r.status_code == 200:
+                    with open(local_filename, 'wb') as f: f.write(r.content)
+                    return True
+        except:
+            continue
+            
     return False
 
 def background_download(url, file_type, task_id):
@@ -86,7 +99,7 @@ def background_download(url, file_type, task_id):
         ext = "mp3" if file_type == 'mp3' else "mp4"
         local_filename = os.path.join(TEMP_DIR, f"{task_id}.{ext}")
         
-        # 1. TikTok კავშირი
+        # 1. TikTok ჩამოტვირთვა
         if "tiktok.com" in url:
             title = download_tiktok_fallback(url, local_filename)
             if title:
@@ -95,12 +108,12 @@ def background_download(url, file_type, task_id):
                 download_tasks[task_id]['title'] = title
                 return
             else:
-                raise Exception("TikTok-ის სერვერი დროებით მიუწვდომელია.")
+                raise Exception("TikTok სერვერი დროებით გადატვირთულია.")
 
-        # 2. YouTube კავშირი
+        # 2. YouTube ჩამოტვირთვა
         yt_id = get_clean_youtube_id(url)
         
-        # ვცდილობთ ჩვეულებრივად yt-dlp-ით
+        # ვცდილობთ ჩვეულებრივად (ლოკალურად)
         opts = {
             'quiet': True,
             'nocheckcertificate': True,
@@ -121,22 +134,22 @@ def background_download(url, file_type, task_id):
                 
                 download_tasks[task_id]['status'] = 'completed'
                 download_tasks[task_id]['filename'] = filename
-                download_tasks[task_id]['title'] = info.get('title', 'Downloaded_Media')
+                download_tasks[task_id]['title'] = info.get('title', 'Media_File')
                 return
-        except Exception as ydl_err:
-            # თუ yt-dlp დაიბლოკა, ავტომატურად გადადის ემბედ-სისტემაზე (ეს უპრობლემოდ გადმოწერს)
+        except Exception:
+            # თუ სტანდარტულმა გზამ არ იმუშავა, გადადის გაძლიერებულ ალტერნატიულ ქსელზე
             if yt_id:
-                success = download_youtube_embed_fallback(yt_id, file_type, local_filename)
+                success = download_youtube_ultimate_fallback(yt_id, file_type, local_filename)
                 if success:
                     download_tasks[task_id]['status'] = 'completed'
                     download_tasks[task_id]['filename'] = local_filename
                     download_tasks[task_id]['title'] = f"YouTube_{yt_id}"
                     return
-            raise ydl_err
+            raise Exception("ყველა საჯარო სერვერი გადატვირთულია. გთხოვთ, სცადოთ 1 წუთში ხელახლა.")
 
     except Exception as e:
         download_tasks[task_id]['status'] = 'failed'
-        download_tasks[task_id]['error'] = "ჩამოტვირთვის სერვერები გადატვირთულია. ხელახლა სცადეთ."
+        download_tasks[task_id]['error'] = str(e)
 
 @app.route('/')
 def index():
