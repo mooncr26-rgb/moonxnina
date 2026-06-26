@@ -87,7 +87,7 @@
         }
         .main-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #52168c; }
 
-        #status { margin-top: 20px; font-size: 0.95rem; color: #00f2fe; font-weight: 500; min-height: 24px; }
+        #status { margin-top: 20px; font-size: 0.95rem; color: #00f2fe; font-weight: 500; min-height: 24px; word-break: break-word; }
 
         .progress-container {
             display: none;
@@ -156,7 +156,6 @@
     <script>
         let savedUrl = "";
         
-        // ⚡️ ჭკვიანი მისამართის ფიქსი: ამოწმებს პროტოკოლს
         const serverUrl = window.location.protocol === 'file:' 
             ? "http://127.0.0.1:5000" 
             : window.location.origin;
@@ -188,7 +187,7 @@
                     status.innerText = "❌ შეცდომა: " + (data.error || "ვერ მოიძებნა");
                 }
             } catch (err) {
-                status.innerText = "❌ სერვერთან კავშირი ვერ დამყარდა! შეამოწმეთ, რომ ტერმინალში app.py ჩართულია.";
+                status.innerText = "❌ სერვერთან კავშირი ვერ დამყარდა!";
             }
         }
 
