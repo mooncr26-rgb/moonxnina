@@ -26,19 +26,29 @@ def ydl_progress_hook(d, task_id):
 def background_download(url, file_type, task_id):
     try:
         outtmpl = os.path.join(TEMP_DIR, f"{task_id}.%(ext)s")
-        
-        # მიუთითებთ სად არის build.sh-ის მიერ ჩამოტვირთული ffmpeg
         ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
         
+        # 🛡️ გაძლიერებული პარამეტრები YouTube-ის ბლოკირების ასავლელად
         opts = {
             'quiet': True,
             'nocheckcertificate': True,
             'outtmpl': outtmpl,
             'progress_hooks': [lambda d: ydl_progress_hook(d, task_id)],
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],
+                    'player_skip': ['configs', 'initial'],
+                }
+            },
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
             }
         }
+        
+        # თუ cookies.txt ფაილს ატვირთავ, კოდი მასაც ავტომატურად გამოიყენებს
+        cookies_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookies.txt')
+        if os.path.exists(cookies_file):
+            opts['cookiefile'] = cookies_file
         
         if os.path.exists(os.path.join(ffmpeg_path, 'ffmpeg')):
             opts['ffmpeg_location'] = ffmpeg_path
@@ -76,8 +86,19 @@ def analyze_video():
     data = request.json or {}
     url = data.get('url')
     if not url: return jsonify({"error": "ბმული აკლია"}), 400
+    
+    # ანალიზისთვისაც ვამატებთ ბლოკის საწინააღმდეგო იდენტურ პარამეტრებს
+    analyze_opts = {
+        'quiet': True, 
+        'nocheckcertificate': True,
+        'extractor_args': {'youtube': {'player_client': ['android', 'web'], 'player_skip': ['configs', 'initial']}}
+    }
+    cookies_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookies.txt')
+    if os.path.exists(cookies_file):
+        analyze_opts['cookiefile'] = cookies_file
+
     try:
-        with yt_dlp.YoutubeDL({'quiet': True, 'nocheckcertificate': True}) as ydl:
+        with yt_dlp.YoutubeDL(analyze_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             return jsonify({"title": info.get('title', 'ვიდეო ხელმისაწვდომია')})
     except Exception as e:
@@ -119,6 +140,5 @@ def get_file(task_id):
     return send_file(filepath, as_attachment=True, download_name=download_name)
 
 if __name__ == '__main__':
-    # Render იყენებს PORT გარემო ცვლადს
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
