@@ -14,11 +14,6 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 
 download_tasks = {}
 
-def get_clean_youtube_id(url):
-    if "youtu.be/" in url: return url.split("youtu.be/")[-1].split("?")[0]
-    if "v=" in url: return url.split("v=")[-1].split("&")[0]
-    return None
-
 def download_tiktok_fallback(url, local_filename):
     try:
         api_url = "https://www.tikwm.com/api/"
@@ -33,73 +28,12 @@ def download_tiktok_fallback(url, local_filename):
         print(f"TikTok Error: {e}")
     return None
 
-def download_youtube_ultimate_fallback(yt_id, file_type, local_filename):
-    """ 
-    YouTube-ის ჩამოტვირთვის უახლესი გზა Piped API-სა და მრავალმხრივი გეითვეების გამოყენებით.
-    """
-    # 1. ვცდილობთ Piped API-ს (ეს არის ყველაზე სტაბილური ამჟამად)
-    try:
-        piped_res = requests.get(f"https://pipedapi.kavin.rocks/streams/{yt_id}", timeout=15).json()
-        
-        if file_type == "mp4" and "videoStreams" in piped_res:
-            # ვეძებთ სასურველ ვიდეო სტრიმს, რომელსაც ხმაც მოჰყვება
-            streams = [s for s in piped_res["videoStreams"] if s.get("videoOnly") is False]
-            if not streams: streams = piped_res["videoStreams"]
-            if streams:
-                video_url = streams[0]["url"]
-                r = requests.get(video_url, timeout=60)
-                if r.status_code == 200:
-                    with open(local_filename, 'wb') as f: f.write(r.content)
-                    return True
-                    
-        elif file_type == "mp3" and "audioStreams" in piped_res:
-            audio_url = piped_res["audioStreams"][0]["url"]
-            r = requests.get(audio_url, timeout=60)
-            if r.status_code == 200:
-                with open(local_filename, 'wb') as f: f.write(r.content)
-                return True
-    except Exception as e:
-        print(f"Piped API failed: {e}")
-
-    # 2. თუ Piped-მა უარი თქვა, გადავდივართ მყარ ალტერნატიულ დამუშავებაზე (Cobalt/Wuk API-ების გაფართოებული სია)
-    gateways = [
-        "https://co.wuk.sh/api/json",
-        "https://api.cobalt.tools/",
-        "https://cobalt.moe/api/json"
-    ]
-    
-    payload = {
-        "url": f"https://www.youtube.com/watch?v={yt_id}",
-        "videoQuality": "720",
-        "downloadMode": "audio" if file_type == "mp3" else "regular"
-    }
-    
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0"
-    }
-
-    for api_url in gateways:
-        try:
-            res = requests.post(api_url, json=payload, headers=headers, timeout=12).json()
-            file_url = res.get("url")
-            if file_url:
-                r = requests.get(file_url, timeout=60)
-                if r.status_code == 200:
-                    with open(local_filename, 'wb') as f: f.write(r.content)
-                    return True
-        except:
-            continue
-            
-    return False
-
 def background_download(url, file_type, task_id):
     try:
         ext = "mp3" if file_type == 'mp3' else "mp4"
         local_filename = os.path.join(TEMP_DIR, f"{task_id}.{ext}")
         
-        # 1. TikTok ჩამოტვირთვა
+        # 1. ტიკტოკის ჩამოტვირთვა
         if "tiktok.com" in url:
             title = download_tiktok_fallback(url, local_filename)
             if title:
@@ -108,48 +42,63 @@ def background_download(url, file_type, task_id):
                 download_tasks[task_id]['title'] = title
                 return
             else:
-                raise Exception("TikTok სერვერი დროებით გადატვირთულია.")
+                raise Exception("TikTok სერვერი დროებით მიუწვდომელია.")
 
-        # 2. YouTube ჩამოტვირთვა
-        yt_id = get_clean_youtube_id(url)
+        # 2. YouTube ჩამოტვირთვა (გაძლიერებული ლოკალური კონვერტაციით)
+        ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
         
-        # ვცდილობთ ჩვეულებრივად (ლოკალურად)
         opts = {
             'quiet': True,
             'nocheckcertificate': True,
             'outtmpl': os.path.join(TEMP_DIR, f"{task_id}.%(ext)s"),
-            'format': 'bestaudio/best' if file_type == 'mp3' else 'best[ext=mp4]/best'
+            # იყენებს კლიენტის სხვადასხვა იმიტაციას ბლოკის ასავლელად
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],
+                    'player_skip': ['configs', 'initial'],
+                }
+            },
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+            }
         }
-        ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
+
         if os.path.exists(os.path.join(ffmpeg_path, 'ffmpeg')):
             opts['ffmpeg_location'] = ffmpeg_path
-        if file_type == 'mp3':
-            opts['postprocessors'] = [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '320'}]
 
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                filename = ydl.prepare_filename(info)
-                if file_type == 'mp3': filename = filename.rsplit('.', 1)[0] + '.mp3'
+        if file_type == 'mp3':
+            # 👑 უმკაცრესი ინსტრუქცია FFmpeg-ისთვის: აიძულებს ფაილის რეალურ აუდიოდ გადაკეთებას
+            opts['format'] = 'bestaudio/best'
+            opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '320'
+            }]
+        else:
+            opts['format'] = 'best[ext=mp4]/best'
+
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+            
+            # ვამოწმებთ, რომ FFmpeg-მა მართლა შეცვალა გაფართოება
+            if file_type == 'mp3' and not filename.endswith('.mp3'):
+                filename = filename.rsplit('.', 1)[0] + '.mp3'
                 
+            if os.path.exists(filename):
                 download_tasks[task_id]['status'] = 'completed'
                 download_tasks[task_id]['filename'] = filename
                 download_tasks[task_id]['title'] = info.get('title', 'Media_File')
-                return
-        except Exception:
-            # თუ სტანდარტულმა გზამ არ იმუშავა, გადადის გაძლიერებულ ალტერნატიულ ქსელზე
-            if yt_id:
-                success = download_youtube_ultimate_fallback(yt_id, file_type, local_filename)
-                if success:
-                    download_tasks[task_id]['status'] = 'completed'
-                    download_tasks[task_id]['filename'] = local_filename
-                    download_tasks[task_id]['title'] = f"YouTube_{yt_id}"
-                    return
-            raise Exception("ყველა საჯარო სერვერი გადატვირთულია. გთხოვთ, სცადოთ 1 წუთში ხელახლა.")
+            else:
+                raise Exception("ფაილის საბოლოო დამუშავება ვერ მოხერხდა.")
 
     except Exception as e:
         download_tasks[task_id]['status'] = 'failed'
-        download_tasks[task_id]['error'] = str(e)
+        err_msg = str(e)
+        if "Sign in to confirm" in err_msg or "429" in err_msg:
+            download_tasks[task_id]['error'] = "YouTube ბლოკავს სერვერს. გთხოვთ ატვირთოთ cookies.txt რეპოზიტორიაში."
+        else:
+            download_tasks[task_id]['error'] = "დამუშავების შეცდომა. ხელახლა სცადეთ."
 
 @app.route('/')
 def index():
@@ -161,9 +110,7 @@ def analyze_video():
     url = data.get('url', '')
     if not url: return jsonify({"error": "ბმული აკლია"}), 400
     if "tiktok.com" in url: return jsonify({"title": "TikTok ვიდეო"})
-    yt_id = get_clean_youtube_id(url)
-    if yt_id: return jsonify({"title": f"YouTube ვიდეო ({yt_id})"})
-    return jsonify({"title": "მედია ფაილი"})
+    return jsonify({"title": "მედია ფაილი ნაპოვნია"})
 
 @app.route('/api/download', methods=['POST'])
 def start_download():
