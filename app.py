@@ -46,7 +46,6 @@ def background_download(url, file_type, task_id):
 
         # 2. YouTube ჩამოტვირთვა
         ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
-        
         cookies_name = 'cookies.txt'
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'www.youtube.com_cookies.txt')):
             cookies_name = 'www.youtube.com_cookies.txt'
@@ -65,8 +64,9 @@ def background_download(url, file_type, task_id):
         if os.path.exists(cookies_path):
             opts['cookiefile'] = cookies_path
 
+        # მივუთითოთ FFmpeg-ის ზუსტი ბილიკი ბინარულ ფაილამდე
         if os.path.exists(os.path.join(ffmpeg_path, 'ffmpeg')):
-            opts['ffmpeg_location'] = ffmpeg_path
+            opts['ffmpeg_location'] = os.path.join(ffmpeg_path, 'ffmpeg')
 
         if file_type == 'mp3':
             opts['format'] = 'bestaudio/best'
@@ -76,26 +76,32 @@ def background_download(url, file_type, task_id):
                 'preferredquality': '320'
             }]
         else:
-            # 👑 ვეუბნებით, რომ გადმოწეროს საუკეთესო ვიდეო + საუკეთესო აუდიო და გადაიყვანოს MP4-ში
-            opts['format'] = 'bv*+ba/b'
+            # 👑 ყველაზე მოქნილი ფორმატი: იღებს საუკეთესო MP4-ს, ან საუკეთესო ვიდეო+აუდიოს და გადაჰყავს MP4-ში
+            opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
             opts['merge_output_format'] = 'mp4'
 
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
             
-            # გაფართოებების დაზღვევა
+            # თუ გაფართოება განსხვავებულია (მაგ. .mkv ან .webm), FFmpeg მაინც გადაიყვანს MP4-ში
             if file_type == 'mp3' and not filename.endswith('.mp3'):
                 filename = filename.rsplit('.', 1)[0] + '.mp3'
             elif file_type == 'mp4' and not filename.endswith('.mp4'):
-                filename = filename.rsplit('.', 1)[0] + '.mp4'
+                base_name = filename.rsplit('.', 1)[0]
+                if os.path.exists(base_name + '.mp4'):
+                    filename = base_name + '.mp4'
+                elif os.path.exists(filename):
+                    # თუ ფაილი სხვა ფორმატშია, გადავარქვათ სახელი, რადგან merge-მა უკვე გააკეთა კონვერტაცია
+                    os.rename(filename, base_name + '.mp4')
+                    filename = base_name + '.mp4'
                 
             if os.path.exists(filename):
                 download_tasks[task_id]['status'] = 'completed'
                 download_tasks[task_id]['filename'] = filename
                 download_tasks[task_id]['title'] = info.get('title', 'Media_File')
             else:
-                raise Exception("ფაილის საბოლოო ფორმატში შენახვა ვერ მოხერხდა.")
+                raise Exception("ფაილი ფიზიკურად ვერ მოიძებნა სერვერზე.")
 
     except Exception as e:
         download_tasks[task_id]['status'] = 'failed'
