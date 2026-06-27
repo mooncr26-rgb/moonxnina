@@ -16,242 +16,39 @@
             --error: #ef4444;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text); line-height: 1.6; padding: 20px; }
+        .container { max-width: 800px; margin: 40px auto; }
+        header { text-align: center; margin-bottom: 40px; }
+        header h1 { font-size: 2.5rem; color: var(--accent); text-transform: uppercase; margin-bottom: 10px; }
+        header p { color: var(--text-muted); font-size: 1.1rem; }
+        
+        .main-card { background: var(--card-bg); padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); margin-bottom: 40px; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        input[type="text"] { flex: 1; padding: 16px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: var(--text); font-size: 1rem; outline: none; }
+        input[type="text"]:focus { border-color: var(--accent); }
+        
+        button { padding: 16px 30px; border-radius: 12px; border: none; background: var(--accent); color: #0f172a; font-weight: bold; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
+        button:hover { background: var(--accent-hover); }
+        button:disabled { background: #334155; color: var(--text-muted); cursor: not-allowed; }
 
-        body {
-            background-color: var(--bg-color);
-            color: var(--text);
-            line-height: 1.6;
-            padding: 20px;
-        }
+        .status-box { display: none; padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: center; font-weight: 500; }
+        .status-box.loading { display: block; background: rgba(56, 189, 248, 0.1); color: var(--accent); border: 1px solid rgba(56, 189, 248, 0.2); }
+        .status-box.error { display: block; background: rgba(239, 68, 68, 0.1); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.2); }
+        .status-box.success { display: block; background: rgba(34, 197, 94, 0.1); color: var(--success); border: 1px solid rgba(34, 197, 94, 0.2); }
 
-        .container {
-            max-width: 800px;
-            margin: 40px auto;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        header h1 {
-            font-size: 2.5rem;
-            color: var(--accent);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 10px;
-        }
-
-        header p {
-            color: var(--text-muted);
-            font-size: 1.1rem;
-        }
-
-        .main-card {
-            background: var(--card-bg);
-            padding: 30px;
-            border-radius: 16px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-            margin-bottom: 40px;
-        }
-
-        .input-group {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        input[type="text"] {
-            flex: 1;
-            padding: 16px;
-            border-radius: 12px;
-            border: 2px solid #334155;
-            background: #0f172a;
-            color: var(--text);
-            font-size: 1rem;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        input[type="text"]:focus {
-            border-color: var(--accent);
-        }
-
-        button {
-            padding: 16px 30px;
-            border-radius: 12px;
-            border: none;
-            background: var(--accent);
-            color: #0f172a;
-            font-weight: bold;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
-        }
-
-        button:hover {
-            background: var(--accent-hover);
-        }
-
-        button:active {
-            transform: scale(0.98);
-        }
-
-        button:disabled {
-            background: #334155;
-            color: var(--text-muted);
-            cursor: not-allowed;
-        }
-
-        .status-box {
-            display: none;
-            padding: 15px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            text-align: center;
-            font-weight: 500;
-        }
-
-        .status-box.loading {
-            display: block;
-            background: rgba(56, 189, 248, 0.1);
-            color: var(--accent);
-            border: 1px solid rgba(56, 189, 248, 0.2);
-        }
-
-        .status-box.error {
-            display: block;
-            background: rgba(239, 68, 68, 0.1);
-            color: var(--error);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-        }
-
-        .status-box.success {
-            display: block;
-            background: rgba(34, 197, 94, 0.1);
-            color: var(--success);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-        }
-
-        .formats-section {
-            display: none;
-            margin-top: 25px;
-            animation: fadeIn 0.3s ease-in-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .formats-section h3 {
-            margin-bottom: 15px;
-            color: var(--accent);
-            border-bottom: 1px solid #334155;
-            padding-bottom: 8px;
-        }
-
-        .format-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 12px;
-            margin-bottom: 25px;
-        }
-
-        .format-btn {
-            background: #0f172a;
-            border: 1px solid #334155;
-            color: var(--text);
-            padding: 12px;
-            border-radius: 10px;
-            cursor: pointer;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-
-        .format-btn:hover {
-            border-color: var(--accent);
-            background: rgba(56, 189, 248, 0.05);
-        }
-
-        .format-btn .qual {
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
-
-        .format-btn .meta {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-        }
-
-        .info-section {
-            margin-top: 50px;
-        }
-
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 40px;
-        }
-
-        @media (max-width: 600px) {
-            .input-group { flex-direction: column; }
-            .info-grid { grid-template-columns: 1fr; }
-        }
-
-        .info-card {
-            background: #1e293b;
-            padding: 20px;
-            border-radius: 12px;
-        }
-
-        .info-card h4 {
-            color: var(--accent);
-            margin-bottom: 10px;
-            font-size: 1.1rem;
-        }
-
-        .faq-section {
-            margin-top: 50px;
-            border-top: 1px solid #334155;
-            padding-top: 40px;
-        }
-
-        .faq-section h2 {
-            text-align: center;
-            margin-bottom: 30px;
-            color: var(--text);
-        }
-
-        .faq-item {
-            background: #1e293b;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 15px;
-        }
-
-        .faq-item h5 {
-            color: var(--accent);
-            font-size: 1.05rem;
-            margin-bottom: 8px;
-        }
-
-        .faq-item p {
-            color: var(--text-muted);
-            font-size: 0.95rem;
-        }
+        .formats-section { display: none; margin-top: 25px; }
+        .formats-section h3 { margin-bottom: 15px; color: var(--accent); border-bottom: 1px solid #334155; padding-bottom: 8px; }
+        .format-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 25px; }
+        
+        .format-btn { background: #0f172a; border: 1px solid #334155; color: var(--text); padding: 15px; border-radius: 10px; cursor: pointer; text-align: center; display: flex; flex-direction: column; gap: 4px; transition: all 0.2s; }
+        .format-btn:hover { border-color: var(--accent); background: rgba(56, 189, 248, 0.05); }
+        .format-btn .qual { font-weight: bold; font-size: 1.1rem; }
+        
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 40px; }
+        .info-card { background: #1e293b; padding: 20px; border-radius: 12px; }
+        .info-card h4 { color: var(--accent); margin-bottom: 10px; }
+        @media (max-width: 600px) { .input-group { flex-direction: column; } .info-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -259,21 +56,21 @@
 <div class="container">
     <header>
         <h1>MOONNINA DOWNLOADER</h1>
-        <p>Convert YouTube to MP4 video from 360p to 4K quickly and reliably with a clean, distraction‑free interface.</p>
+        <p>სწრაფი და უსაფრთხო YouTube & TikTok კონვერტერი რეკლამების გარეშე.</p>
     </header>
 
     <div class="main-card">
         <div class="input-group">
             <input type="text" id="videoUrl" placeholder="ჩასვით YouTube ან TikTok ლინკი აქ...">
-            <button id="analyzeBtn" onclick="analyzeUrl()">Convert</button>
+            <button id="convertBtn" onclick="processVideo()">Convert</button>
         </div>
 
         <div id="statusBox" class="status-box"></div>
 
         <div id="formatsSection" class="formats-section">
-            <h2 id="videoTitle" style="font-size: 1.2rem; margin-bottom: 20px; text-align: center;"></h2>
+            <h2 id="videoTitle" style="font-size: 1.2rem; margin-bottom: 20px; text-align: center; color: #fff;">🎯 მედია ფაილი მზად არის</h2>
             
-            <h3>MP4 ვიდეო (360p - 4K)</h3>
+            <h3>MP4 ვიდეო ხმით</h3>
             <div id="videoGrid" class="format-grid"></div>
 
             <h3>MP3 აუდიო</h3>
@@ -281,184 +78,103 @@
         </div>
     </div>
 
-    <div class="info-section">
-        <div class="info-grid">
-            <div class="info-card">
-                <h4>როგორ გადავაკეთოთ?</h4>
-                <p>1) დააკოპირეთ ლინკი ბრაუზერიდან.<br>2) ჩასვით ველში და დააჭირეთ Convert-ს.<br>3) აირჩიეთ სასურველი რეზოლუცია და გადმოწერეთ.</p>
-            </div>
-            <div class="info-card">
-                <h4>რატომ MOONNINA?</h4>
-                <p>სრულიად უფასო, სწრაფი და რეკლამების გარეშე. არანაირი შეზღუდვა, Pop-up ფანჯარა ან ფეიქ ღილაკები.</p>
-            </div>
+    <div class="info-grid">
+        <div class="info-card">
+            <h4>როგორ მუშაობს?</h4>
+            <p>ჩასვით ლინკი, დააჭირეთ Convert-ს, აირჩიეთ ფორმატი და გადმოწერა დაიწყება მომენტალურად ბრაუზერში.</p>
         </div>
-
-        <div class="info-grid">
-            <div class="info-card">
-                <h4>მოწყობილობების მხარდაჭერა</h4>
-                <p>მუშაობს იდეალურად iPhone-ზე (Safari-ში Save to Files ფუნქციით), Android-ზე, Windows-სა და macOS-ზე ყოველგვარი აპლიკაციის გარეშე.</p>
-            </div>
-            <div class="info-card">
-                <h4>ხმა რეზოლუციებზე</h4>
-                <p>თუ რომელიმე მაღალ ხარისხზე ხმა არ ისმის, ეს ნიშნავს რომ YouTube მხოლოდ ვიდეოს აწვდის სერვერს. აირჩიეთ უახლოესი მეზობელი ხარისხი.</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="faq-section">
-        <h2>ხშირად დასმული კითხვები (FAQ)</h2>
-        
-        <div class="faq-item">
-            <h5>არის თუ არა უფასო და უსაფრთხო?</h5>
-            <p>დიახ, პლატფორმა მუშაობს პირდაპირ ბრაუზერში, რეგისტრაციისა და ზედმეტი ნაბიჯების გარეშე.</p>
-        </div>
-        <div class="faq-item">
-            <h5>რატომ ვერ ვხედავ 1080p/4K-ს ხმით?</h5>
-            <p>ხანდახან კონკრეტულ რეზოლუციაზე YouTube არ იძლევა აუდიო ნაკადს. ასეთ დროს აირჩიეთ სხვა ალტერნატიული ხარისხი სიიდან.</p>
-        </div>
-        <div class="faq-item">
-            <h5>მუშაობს თუ არა ტელეფონებზე?</h5>
-            <p>დიახ. iPhone-ზე გამოიყენეთ Safari და ჩამოტვირთვისას აირჩიეთ "Save to Files". Android-ზე ფაილები პირდაპირ Downloads საქაღალდეში მიდის.</p>
-        </div>
-        <div class="faq-item">
-            <h5>შემიძლია გრძელი ვიდეოების გადმოწერა?</h5>
-            <p>დიახ, თუმცა დიდ ვიდეოებს მეტი დრო სჭირდება. მობილურზე გადმოწერისას სასურველია ჩანართი (Tab) აქტიური დატოვოთ სტაბილურ Wi-Fi-ზე.</p>
+        <div class="info-card">
+            <h4>სრული თავსებადობა</h4>
+            <p>მუშაობს იდეალურად iPhone (Safari), Android (Chrome), Windows და Mac მოწყობილობებზე.</p>
         </div>
     </div>
 </div>
 
 <script>
     const statusBox = document.getElementById('statusBox');
-    const analyzeBtn = document.getElementById('analyzeBtn');
+    const convertBtn = document.getElementById('convertBtn');
     const formatsSection = document.getElementById('formatsSection');
     const videoGrid = document.getElementById('videoGrid');
     const audioGrid = document.getElementById('audioGrid');
-    const videoTitle = document.getElementById('videoTitle');
 
     function showStatus(text, type) {
         statusBox.className = `status-box ${type}`;
         statusBox.innerText = text;
     }
 
-    async function analyzeUrl() {
+    // საჯარო კობალტის სერვერები ბლოკირების ასავლელად
+    const COBALT_APIS = [
+        "https://api.cobalt.tools/api/json",
+        "https://cobalt.api.v01.io/api/json",
+        "https://co.wuk.sh/api/json"
+    ];
+
+    async function tryCobalt(url, mode, quality = "720") {
+        const payload = { url: url, videoQuality: quality, downloadMode: mode, audioFormat: "mp3" };
+        
+        for (let api of COBALT_APIS) {
+            try {
+                let response = await fetch(api, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (response.ok) {
+                    let data = await response.json();
+                    if (data.url) return data.url;
+                }
+            } catch (e) {
+                console.log("სერვერმა უარი თქვა, გადავდივართ შემდეგზე...");
+            }
+        }
+        return null;
+    }
+
+    async function processVideo() {
         const url = document.getElementById('videoUrl').value.trim();
-        if(!url) {
-            showStatus('გთხოვთ ჩასვათ ვალიდური ბმული!', 'error');
+        if (!url) {
+            showStatus('გთხოვთ ჩასვათ ლინკი!', 'error');
             return;
         }
 
-        showStatus('მიმდინარეობს ბმულის დამუშავება და ხარისხების ძებნა...', 'loading');
-        analyzeBtn.disabled = true;
+        showStatus('მიმდინარეობს ვიდეოს დამუშავება...', 'loading');
+        convertBtn.disabled = true;
         formatsSection.style.display = 'none';
 
-        try {
-            const res = await fetch('/api/formats', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url })
-            });
-            const data = await res.json();
+        // ვიღებთ ვიდეო და აუდიო ლინკებს პირდაპირ კლიენტის ბრაუზერიდან
+        const videoUrl = await tryCobalt(url, "regular", "720");
+        const audioUrl = await tryCobalt(url, "audio");
 
-            if(!res.ok || data.error) {
-                showStatus(data.error || 'ვიდეოს წაკითხვა ვერ მოხერხდა.', 'error');
-                analyzeBtn.disabled = false;
-                return;
-            }
-
-            videoTitle.innerText = data.title;
-            videoGrid.innerHTML = '';
-            audioGrid.innerHTML = '';
-
-            // ვიდეო ფორმატები
-            if(data.video && data.video.length > 0) {
-                data.video.forEach(f => {
-                    const sizeText = f.filesize ? `(~${(f.filesize / (1024*1024)).toFixed(1)} MB)` : '';
-                    const audioIcon = f.has_audio ? '🔊' : '🔇 ხმის გარეშე';
-                    
-                    const btn = document.createElement('button');
-                    btn.className = 'format-btn';
-                    btn.innerHTML = `<span class="qual">${f.quality} (.${f.ext})</span>
-                                     <span class="meta">${audioIcon} ${sizeText}</span>`;
-                    btn.onclick = () => startDownload(url, 'mp4', f.format_id, f.has_audio);
-                    videoGrid.appendChild(btn);
-                });
-            } else {
-                videoGrid.innerHTML = '<p style="color:var(--text-muted)">ვიდეო ფორმატები არ არის ხელმისაწვდომი</p>';
-            }
-
-            // აუდიო ფორმატები
-            if(data.audio && data.audio.length > 0) {
-                data.audio.forEach(f => {
-                    const sizeText = f.filesize ? `(~${(f.filesize / (1024*1024)).toFixed(1)} MB)` : '';
-                    const btn = document.createElement('button');
-                    btn.className = 'format-btn';
-                    btn.innerHTML = `<span class="qual">${f.quality}</span>
-                                     <span class="meta">🎵 MP3 აუდიო ${sizeText}</span>`;
-                    btn.onclick = () => startDownload(url, 'mp3', f.format_id, true);
-                    audioGrid.appendChild(btn);
-                });
-            } else {
-                // თუ სია ცარიელია, მაინც მივცეთ საუკეთესო MP3-ის გადმოწერის შანსი
-                const btn = document.createElement('button');
-                btn.className = 'format-btn';
-                btn.innerHTML = `<span class="qual">საუკეთესო ხარისხი</span><span class="meta">🎵 MP3 აუდიო</span>`;
-                btn.onclick = () => startDownload(url, 'mp3', null, true);
-                audioGrid.appendChild(btn);
-            }
-
-            showStatus('ხარისხები ნაპოვნია! აირჩიეთ სასურველი ფორმატი ქვევით.', 'success');
-            formatsSection.style.display = 'block';
-
-        } catch (err) {
-            showStatus('სერვერთან კავშირი ვერ დამყარდა.', 'error');
-        } finally {
-            analyzeBtn.disabled = false;
+        if (!videoUrl && !audioUrl) {
+            showStatus('ვიდეოს წაკითხვა ვერ მოხერხდა. გთხოვთ შეამოწმოთ ლინკი ან სცადოთ სხვა ვიდეო.', 'error');
+            convertBtn.disabled = false;
+            return;
         }
-    }
 
-    async function startDownload(url, type, formatId, hasAudio) {
-        showStatus('მიმდინარეობს კონვერტაცია და ფაილის მომზადება სერვერზე. გთხოვთ არ დახუროთ გვერდი...', 'loading');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        videoGrid.innerHTML = '';
+        audioGrid.innerHTML = '';
 
-        try {
-            const res = await fetch('/api/download', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, type, format_id: formatId, has_audio: hasAudio })
-            });
-            const task = await res.json();
-
-            if(!res.ok || task.error) {
-                showStatus(task.error || 'კონვერტაციის დაწყება ვერ მოხერხდა.', 'error');
-                return;
-            }
-
-            checkProgress(task.task_id);
-
-        } catch (err) {
-            showStatus('ჩამოტვირთვის მოთხოვნა ჩავარდა.', 'error');
+        if (videoUrl) {
+            videoGrid.innerHTML = `
+                <button class="format-btn" onclick="window.open('${videoUrl}', '_blank')">
+                    <span class="qual">HD ხარისხი (MP4)</span>
+                    <span style="font-size:0.8rem; color:var(--text-muted)">🔊 ხმით სრული ვერსია</span>
+                </button>
+            `;
         }
-    }
 
-    async function checkProgress(taskId) {
-        const interval = setInterval(async () => {
-            try {
-                const res = await fetch(`/api/progress/${taskId}`);
-                const data = await res.json();
+        if (audioUrl) {
+            audioGrid.innerHTML = `
+                <button class="format-btn" onclick="window.open('${audioUrl}', '_blank')">
+                    <span class="qual">საუკეთესო MP3</span>
+                    <span style="font-size:0.8rem; color:var(--text-muted)">🎵 მხოლოდ აუდიო ფაილი</span>
+                </button>
+            `;
+        }
 
-                if(data.status === 'completed') {
-                    clearInterval(interval);
-                    showStatus('კონვერტაცია დასრულდა! ფაილი იტვირთება...', 'success');
-                    window.location.href = `/api/get_file/${taskId}`;
-                } else if(data.status === 'failed') {
-                    clearInterval(interval);
-                    showStatus(data.error || 'ჩამოტვირთვა ვერ მოხერხდა. სცადეთ სხვა რეზოლუცია.', 'error');
-                }
-            } catch (err) {
-                clearInterval(interval);
-                showStatus('პროგრესის შემოწმება ჩავარდა.', 'error');
-            }
-        }, 3000);
+        showStatus('ფაილები წარმატებით მომზადდა!', 'success');
+        formatsSection.style.display = 'block';
+        convertBtn.disabled = false;
     }
 </script>
 
