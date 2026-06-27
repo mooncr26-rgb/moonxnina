@@ -46,46 +46,12 @@ def get_clean_youtube_id(url):
     return None
 
 
-import time
-
-STATIC_PIPED_BASES = [
-    "https://pipedapi.kavin.rocks",
-    "https://pipedapi-libre.kavin.rocks",
-    "https://piped-api.privacy.com.de",
-    "https://pipedapi.adminforge.de",
-    "https://api.piped.yt",
-    "https://pipedapi.drgns.space",
-    "https://pipedapi.owo.si",
-    "https://pipedapi.darkness.services",
+PIPED_INSTANCES = [
+    "https://pipedapi.kavin.rocks/streams/",
+    "https://pipedapi.colby.moe/streams/",
+    "https://api.piped.yt/streams/",
+    "https://pipedapi.us.to/streams/"
 ]
-
-_piped_cache = {"bases": None, "ts": 0}
-
-
-def get_piped_bases():
-    """Piped's public-instance list changes constantly (instances die/rotate
-    every few months). Pull the live list from Piped's own directory first;
-    fall back to a refreshed static list if that directory itself is down."""
-    now = time.time()
-    if _piped_cache["bases"] and now - _piped_cache["ts"] < 600:
-        return _piped_cache["bases"]
-
-    bases = []
-    try:
-        res = requests.get("https://piped-instances.kavin.rocks/", timeout=6).json()
-        for inst in res:
-            api_url = inst.get('api_url') or inst.get('apiUrl')
-            if api_url:
-                bases.append(api_url.rstrip('/'))
-    except Exception as e:
-        print(f"[piped instances] live directory fetch failed: {e}")
-
-    if not bases:
-        bases = STATIC_PIPED_BASES
-
-    _piped_cache["bases"] = bases
-    _piped_cache["ts"] = now
-    return bases
 
 
 def base_ydl_opts():
@@ -101,10 +67,7 @@ def base_ydl_opts():
     ffmpeg_path = get_ffmpeg_path()
     if ffmpeg_path:
         opts['ffmpeg_location'] = ffmpeg_path
-    # Render/most cloud hosts use datacenter IPs that YouTube blocks far more
-    # aggressively than home IPs. If you have access to a proxy (residential
-    # or otherwise), set YTDLP_PROXY as an env var on Render and yt-dlp will
-    # route through it automatically.
+    
     proxy = os.environ.get('YTDLP_PROXY')
     if proxy:
         opts['proxy'] = proxy
@@ -115,21 +78,17 @@ def base_ydl_opts():
 # TikTok fallback
 # ---------------------------------------------------------------------------
 
-def download_tiktok_fallback(url, local_filename, format_id=None):
-    headers = {'User-Agent': USER_AGENT, 'Referer': 'https://www.tikwm.com/'}
+def download_tiktok_fallback(url, local_filename):
     try:
-        res = requests.post("https://www.tikwm.com/api/", data={'url': url, 'hd': 1},
-                             headers=headers, timeout=20).json()
+        api_url = "https://www.tikwm.com/api/"
+        headers = {'User-Agent': USER_AGENT}
+        res = requests.post(api_url, data={'url': url}, headers=headers, timeout=20).json()
         if res.get('code') == 0:
-            data = res['data']
-            if format_id == 'tiktok_sd':
-                video_url = data.get('play') or data.get('hdplay')
-            else:
-                video_url = data.get('hdplay') or data.get('play')
+            video_url = res['data']['play']
             video_bytes = requests.get(video_url, headers=headers, timeout=30).content
             with open(local_filename, 'wb') as f:
                 f.write(video_bytes)
-            return data.get('title', 'TikTok_Video')
+            return res['data'].get('title', 'MOONNINA_DOWNLOADER_TikTok')
         print(f"[TikTok] API returned code={res.get('code')} msg={res.get('msg')}")
     except Exception as e:
         print(f"[TikTok] Error: {e}")
@@ -137,59 +96,41 @@ def download_tiktok_fallback(url, local_filename, format_id=None):
 
 
 def get_tiktok_info(url):
-    """Used by /api/formats — returns (info, error_message)."""
-    headers = {'User-Agent': USER_AGENT, 'Referer': 'https://www.tikwm.com/'}
     try:
-        res = requests.post("https://www.tikwm.com/api/", data={'url': url, 'hd': 1},
-                             headers=headers, timeout=20).json()
+        headers = {'User-Agent': USER_AGENT}
+        res = requests.post("https://www.tikwm.com/api/", data={'url': url}, headers=headers, timeout=20).json()
+        if res.get('code') == 0:
+            data = res['data']
+            size = data.get('size') or data.get('hd_size')
+            return {
+                "title": data.get('title', 'MOONNINA DOWNLOADER - TikTok'),
+                "video": [{
+                    "format_id": "tiktok_direct",
+                    "quality": "Original (no watermark)",
+                    "ext": "mp4",
+                    "filesize": size,
+                    "has_audio": True,
+                    "protocol": "direct",
+                }],
+                "audio": []
+            }
     except Exception as e:
-        print(f"[TikTok formats] request failed: {e}")
-        return None, f"TikTok API-სთან კავშირი ვერ მოხერხდა: {e}"
-
-    if res.get('code') == 0:
-        data = res['data']
-        options = []
-        if data.get('hdplay'):
-            options.append({
-                "format_id": "tiktok_hd",
-                "quality": "HD (no watermark)",
-                "ext": "mp4",
-                "filesize": data.get('hd_size'),
-                "has_audio": True,
-            })
-        if data.get('play'):
-            options.append({
-                "format_id": "tiktok_sd",
-                "quality": "SD (no watermark)",
-                "ext": "mp4",
-                "filesize": data.get('size'),
-                "has_audio": True,
-            })
-        if not options:
-            return None, "TikTok-მა ვიდეო ვერ დააბრუნა (ანგარიში/ვიდეო პრივატულია?)"
-        return {
-            "title": data.get('title', 'TikTok ვიდეო'),
-            "video": options,
-            "audio": []
-        }, None
-
-    msg = res.get('msg', 'უცნობი შეცდომა')
-    print(f"[TikTok formats] API error code={res.get('code')} msg={msg}")
-    return None, f"TikTok API-მ უარი თქვა: {msg}"
+        print(f"[TikTok formats] Error: {e}")
+    return None
 
 
 # ---------------------------------------------------------------------------
-# YouTube proxy fallback (best-effort — public mirrors go down/rotate often)
+# YouTube proxy fallback
 # ---------------------------------------------------------------------------
 
 def download_youtube_proxy_fallback(yt_id, file_type, local_filename):
-    for base_url in get_piped_bases():
+    for base_url in PIPED_INSTANCES:
         try:
-            res = requests.get(f"{base_url}/streams/{yt_id}", timeout=10).json()
+            res = requests.get(f"{base_url}{yt_id}", timeout=10).json()
 
             if file_type == "mp3" and "audioStreams" in res and res["audioStreams"]:
                 audio_url = res["audioStreams"][0]["url"]
-                r = requests.get(audio_url, timeout=45)
+                r = requests.get(audio_url, timeout=45, headers={'User-Agent': USER_AGENT})
                 if r.status_code == 200:
                     with open(local_filename, 'wb') as f:
                         f.write(r.content)
@@ -201,7 +142,7 @@ def download_youtube_proxy_fallback(yt_id, file_type, local_filename):
                     streams = res["videoStreams"]
                 if streams:
                     video_url = streams[0]["url"]
-                    r = requests.get(video_url, timeout=60)
+                    r = requests.get(video_url, timeout=60, headers={'User-Agent': USER_AGENT})
                     if r.status_code == 200:
                         with open(local_filename, 'wb') as f:
                             f.write(r.content)
@@ -220,11 +161,11 @@ def download_youtube_proxy_fallback(yt_id, file_type, local_filename):
         try:
             r_cobalt = requests.post(
                 api_url, json=payload,
-                headers={"Accept": "application/json", "Content-Type": "application/json"},
+                headers={"Accept": "application/json", "Content-Type": "application/json", "User-Agent": USER_AGENT},
                 timeout=15
             ).json()
             if "url" in r_cobalt:
-                file_bytes = requests.get(r_cobalt["url"], timeout=60).content
+                file_bytes = requests.get(r_cobalt["url"], headers={'User-Agent': USER_AGENT}, timeout=60).content
                 with open(local_filename, 'wb') as f:
                     f.write(file_bytes)
                 return True
@@ -237,13 +178,10 @@ def download_youtube_proxy_fallback(yt_id, file_type, local_filename):
 
 
 def get_youtube_formats_via_piped(yt_id):
-    """Used by /api/formats when yt-dlp itself is blocked. Returns direct
-    stream URLs (prefixed so background_download knows to fetch them with
-    plain requests instead of yt-dlp)."""
-    for base_url in get_piped_bases():
+    for base_url in PIPED_INSTANCES:
         try:
-            res = requests.get(f"{base_url}/streams/{yt_id}", timeout=10).json()
-            title = res.get('title', 'YouTube ვიდეო')
+            res = requests.get(f"{base_url}{yt_id}", timeout=10).json()
+            title = res.get('title', 'MOONNINA DOWNLOADER - YouTube')
 
             video_list, audio_list, seen = [], [], set()
 
@@ -285,7 +223,7 @@ def get_youtube_formats_via_piped(yt_id):
 
 
 # ---------------------------------------------------------------------------
-# Format listing — powers the "show every available quality" UI
+# Format listing
 # ---------------------------------------------------------------------------
 
 @app.route('/api/formats', methods=['POST'])
@@ -296,10 +234,10 @@ def get_formats():
         return jsonify({"error": "ბმული არ მოწოდებულა"}), 400
 
     if "tiktok.com" in url:
-        info, err = get_tiktok_info(url)
+        info = get_tiktok_info(url)
         if info:
             return jsonify(info)
-        return jsonify({"error": err or "TikTok ვიდეოს ინფორმაცია ვერ მოიძებნა"}), 502
+        return jsonify({"error": "TikTok ვიდეოს ინფორმაცია ვერ მოიძებნა. გთხოვთ სცადოთ ხელახლა."}), 502
 
     ydl_opts = base_ydl_opts()
     ydl_opts['skip_download'] = True
@@ -365,7 +303,7 @@ def get_formats():
     audio_list.sort(key=lambda x: x['filesize'] or 0, reverse=True)
 
     return jsonify({
-        "title": info.get('title', 'მედია ფაილი'),
+        "title": info.get('title', 'MOONNINA DOWNLOADER მედია'),
         "video": video_list[:8],
         "audio": audio_list[:4],
     })
@@ -382,16 +320,16 @@ def background_download(url, file_type, task_id, format_id=None, has_audio=True)
 
         # 1. TikTok
         if "tiktok.com" in url:
-            title = download_tiktok_fallback(url, local_filename, format_id)
+            title = download_tiktok_fallback(url, local_filename)
             if title:
                 download_tasks[task_id]['status'] = 'completed'
                 download_tasks[task_id]['filename'] = local_filename
                 download_tasks[task_id]['title'] = title
                 return
             else:
-                raise Exception("TikTok სერვერი დროებით მიუწვდომელია ან ვიდეო პრივატულია.")
+                raise Exception("TikTok სერვერი დროებით მიუწვდომელია.")
 
-        # 2. Direct stream URL handed back by the Piped fallback in /api/formats
+        # 2. Direct stream URL (Piped fallback)
         if format_id and format_id.startswith("pipedurl:"):
             stream_url = format_id[len("pipedurl:"):]
             try:
@@ -401,14 +339,14 @@ def background_download(url, file_type, task_id, format_id=None, has_audio=True)
                         f.write(r.content)
                     download_tasks[task_id]['status'] = 'completed'
                     download_tasks[task_id]['filename'] = local_filename
-                    download_tasks[task_id]['title'] = f"YouTube_{get_clean_youtube_id(url) or task_id}"
+                    download_tasks[task_id]['title'] = f"MOONNINA_{get_clean_youtube_id(url) or task_id}"
                     return
                 raise Exception(f"Piped stream returned status {r.status_code}")
             except Exception as e:
                 print(f"[pipedurl] direct download failed: {e}")
                 raise Exception("ამ ხარისხის ჩამოტვირთვა ვერ მოხერხდა, სცადეთ სხვა ხარისხი.")
 
-        # 3. YouTube / other yt-dlp-supported sites
+        # 3. YouTube / Other sites
         yt_id = get_clean_youtube_id(url)
         opts = base_ydl_opts()
         opts['outtmpl'] = os.path.join(TEMP_DIR, f"{task_id}.%(ext)s")
@@ -442,13 +380,11 @@ def background_download(url, file_type, task_id, format_id=None, has_audio=True)
                 if os.path.exists(filename):
                     download_tasks[task_id]['status'] = 'completed'
                     download_tasks[task_id]['filename'] = filename
-                    download_tasks[task_id]['title'] = info.get('title', 'Media_File')
+                    download_tasks[task_id]['title'] = info.get('title', 'MOONNINA_File')
                     return
                 else:
-                    raise Exception("yt-dlp-მა დასრულდა შეცდომის გარეშე, მაგრამ ფაილი არ შეიქმნა.")
+                    raise Exception("yt-dlp-მა დაასრულა შეცდომის გარეშე, მაგრამ ფაილი არ შეიქმნა.")
         except Exception as e:
-            # Log the REAL reason instead of swallowing it — this is what was
-            # hiding the actual cause of every YouTube failure.
             print(f"[yt-dlp] local download failed for task {task_id}: {e}")
             traceback.print_exc()
 
@@ -457,11 +393,11 @@ def background_download(url, file_type, task_id, format_id=None, has_audio=True)
                 if success:
                     download_tasks[task_id]['status'] = 'completed'
                     download_tasks[task_id]['filename'] = local_filename
-                    download_tasks[task_id]['title'] = f"YouTube_{yt_id}"
+                    download_tasks[task_id]['title'] = f"MOONNINA_{yt_id}"
                     return
             raise Exception(
-                f"ჩამოტვირთვა ვერ მოხერხდა (YouTube-მა შესაძლოა დაბლოკა სერვერის IP). "
-                f"სცადეთ cookies.txt-ის განახლება ან proxy-ის დამატება. დეტალები: {e}"
+                "ჩამოტვირთვა ვერ მოხერხდა (YouTube-მა შესაძლოა დაბლოკა სერვერის IP). "
+                "სცადეთ სხვა ვიდეო ან ხარისხი."
             )
 
     except Exception as e:
@@ -480,8 +416,7 @@ def index():
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze_video():
-    # Kept for backwards compatibility with old frontend calls.
-    return jsonify({"title": "მედია ფაილი ნაპოვნია"})
+    return jsonify({"title": "MOONNINA DOWNLOADER"})
 
 
 @app.route('/api/download', methods=['POST'])
@@ -521,7 +456,7 @@ def get_file(task_id):
         return "არ არის მზად", 400
     safe_title = "".join([c for c in task['title'] if c.isalpha() or c.isdigit() or c == ' ']).rstrip()
     ext = task['filename'].split('.')[-1]
-    return send_file(task['filename'], as_attachment=True, download_name=f"{safe_title or 'media'}.{ext}")
+    return send_file(task['filename'], as_attachment=True, download_name=f"{safe_title or 'moonnina_media'}.{ext}")
 
 
 if __name__ == '__main__':
