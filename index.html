@@ -6,116 +6,180 @@
 <title>Media Downloader</title>
 <style>
   :root{
-    --bg:#0d0f14;
-    --card:#171a21;
-    --card-border:#262b35;
-    --text:#e8eaed;
-    --muted:#8b93a3;
-    --accent:#3b82f6;
-    --accent-hover:#2f6fdb;
-    --ok:#22c55e;
-    --err:#ef4444;
-    --tag:#f59e0b;
+    --bg-1:#0f0c29;
+    --bg-2:#1a1340;
+    --card:rgba(255,255,255,0.05);
+    --card-border:rgba(255,255,255,0.10);
+    --text:#f1eefc;
+    --muted:#a3a0c2;
+
+    --grad-1:#ff5fa2;
+    --grad-2:#a35bff;
+    --grad-3:#4f8cff;
+
+    --hd:#ff7a45;
+    --hd-bg:rgba(255,122,69,0.16);
+    --mid:#4f8cff;
+    --mid-bg:rgba(79,140,255,0.16);
+    --low:#34d399;
+    --low-bg:rgba(52,211,153,0.16);
+    --audio:#c084fc;
+    --audio-bg:rgba(192,132,252,0.16);
+
+    --ok:#34d399;
+    --err:#ff6b8a;
   }
   *{box-sizing:border-box;}
   body{
     margin:0;
-    background:var(--bg);
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(163,91,255,0.35), transparent 45%),
+      radial-gradient(circle at 100% 20%, rgba(79,140,255,0.30), transparent 40%),
+      radial-gradient(circle at 20% 100%, rgba(255,95,162,0.25), transparent 45%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    background-attachment:fixed;
     color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    padding:24px 16px 80px;
+    padding:32px 16px 90px;
   }
   .wrap{max-width:640px;margin:0 auto;}
-  h1{font-size:20px;margin:0 0 4px;}
-  p.sub{color:var(--muted);margin:0 0 20px;font-size:14px;}
-  .input-row{display:flex;gap:8px;margin-bottom:24px;}
+
+  h1{
+    font-size:26px;
+    margin:0 0 4px;
+    font-weight:800;
+    background:linear-gradient(90deg, var(--grad-1), var(--grad-2), var(--grad-3));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    background-size:200% auto;
+    animation:shine 6s linear infinite;
+  }
+  @keyframes shine{
+    to{background-position:200% center;}
+  }
+  p.sub{color:var(--muted);margin:0 0 24px;font-size:14px;}
+
+  .input-row{display:flex;gap:10px;margin-bottom:26px;}
   input[type=text]{
     flex:1;
-    padding:13px 14px;
-    border-radius:10px;
+    padding:14px 16px;
+    border-radius:14px;
     border:1px solid var(--card-border);
-    background:var(--card);
+    background:rgba(255,255,255,0.06);
     color:var(--text);
     font-size:14px;
     outline:none;
+    transition:border-color .2s, box-shadow .2s;
   }
-  input[type=text]:focus{border-color:var(--accent);}
+  input[type=text]::placeholder{color:#7d79a3;}
+  input[type=text]:focus{
+    border-color:var(--grad-2);
+    box-shadow:0 0 0 3px rgba(163,91,255,0.25);
+  }
   button.primary{
-    padding:13px 20px;
-    border-radius:10px;
+    padding:14px 22px;
+    border-radius:14px;
     border:none;
-    background:var(--accent);
+    background:linear-gradient(135deg, var(--grad-1), var(--grad-2));
     color:#fff;
-    font-weight:600;
+    font-weight:700;
     font-size:14px;
     cursor:pointer;
+    box-shadow:0 6px 18px rgba(163,91,255,0.35);
+    transition:transform .15s, box-shadow .15s;
   }
-  button.primary:hover{background:var(--accent-hover);}
-  button.primary:disabled{opacity:.5;cursor:default;}
+  button.primary:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(163,91,255,0.45);}
+  button.primary:active{transform:translateY(0);}
+  button.primary:disabled{opacity:.5;cursor:default;box-shadow:none;}
 
   .section-title{
-    font-size:13px;
+    font-size:12px;
+    font-weight:700;
     color:var(--muted);
     text-transform:uppercase;
-    letter-spacing:.04em;
-    margin:22px 0 10px;
+    letter-spacing:.08em;
+    margin:24px 0 12px;
   }
-  .video-title{font-size:15px;font-weight:600;margin:0 0 14px;color:var(--text);}
+  .video-title{
+    font-size:16px;
+    font-weight:700;
+    margin:4px 0 6px;
+    color:var(--text);
+  }
 
   .card{
     display:flex;
     align-items:center;
-    gap:12px;
+    gap:14px;
     background:var(--card);
     border:1px solid var(--card-border);
-    border-radius:12px;
-    padding:12px 14px;
-    margin-bottom:10px;
+    border-radius:16px;
+    padding:13px 14px;
+    margin-bottom:11px;
+    backdrop-filter:blur(6px);
+    transition:border-color .2s, transform .15s;
   }
+  .card:hover{border-color:rgba(255,255,255,0.22);transform:translateY(-1px);}
+
   .play-dot{
-    width:34px;height:34px;border-radius:50%;
-    background:#222736;
+    width:38px;height:38px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;
     flex-shrink:0;
-    color:var(--accent);
     font-size:14px;
+    color:#fff;
   }
+  .play-dot.hd{background:linear-gradient(135deg,#ff7a45,#ff5fa2);}
+  .play-dot.mid{background:linear-gradient(135deg,#4f8cff,#a35bff);}
+  .play-dot.low{background:linear-gradient(135deg,#34d399,#4f8cff);}
+  .play-dot.audio{background:linear-gradient(135deg,#c084fc,#ff5fa2);}
+
   .meta{flex:1;min-width:0;}
   .meta .name{
     font-size:13px;color:var(--text);
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    margin-bottom:4px;
+    margin-bottom:5px;
   }
-  .meta .row{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);}
+  .meta .row{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);flex-wrap:wrap;}
+
   .badge{
-    background:var(--tag);
-    color:#1a1300;
-    font-weight:700;
+    font-weight:800;
     font-size:11px;
-    padding:2px 7px;
-    border-radius:5px;
+    padding:3px 9px;
+    border-radius:7px;
   }
+  .badge.hd{color:var(--hd);background:var(--hd-bg);}
+  .badge.mid{color:var(--mid);background:var(--mid-bg);}
+  .badge.low{color:var(--low);background:var(--low-bg);}
+  .badge.audio{color:var(--audio);background:var(--audio-bg);}
+
   .dl-btn{
-    background:var(--accent);
+    background:linear-gradient(135deg, var(--grad-2), var(--grad-3));
     color:#fff;
     border:none;
-    border-radius:8px;
-    padding:9px 16px;
+    border-radius:10px;
+    padding:10px 18px;
     font-size:13px;
-    font-weight:600;
+    font-weight:700;
     cursor:pointer;
     flex-shrink:0;
     white-space:nowrap;
+    box-shadow:0 4px 14px rgba(79,140,255,0.30);
+    transition:transform .15s, box-shadow .15s;
   }
-  .dl-btn:hover{background:var(--accent-hover);}
-  .dl-btn:disabled{opacity:.6;cursor:default;}
+  .dl-btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(79,140,255,0.4);}
+  .dl-btn:disabled{opacity:.6;cursor:default;transform:none;box-shadow:none;}
 
-  .status{font-size:13px;margin-top:6px;}
+  .status{font-size:12px;margin-top:5px;font-weight:600;}
   .status.err{color:var(--err);}
   .status.ok{color:var(--ok);}
-  .empty{color:var(--muted);font-size:14px;text-align:center;padding:40px 0;}
+
+  .empty{color:var(--muted);font-size:14px;text-align:center;padding:48px 0;}
+  .empty.err{color:var(--err);}
+
   .spinner{
-    width:16px;height:16px;border-radius:50%;
+    width:15px;height:15px;border-radius:50%;
     border:2px solid rgba(255,255,255,.4);
     border-top-color:#fff;
     display:inline-block;
@@ -126,7 +190,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>ვიდეო / აუდიო ჩამოტვირთვა</h1>
+  <h1>Media Downloader</h1>
   <p class="sub">ჩასვი YouTube ან TikTok ბმული — გამოჩნდება ყველა ხელმისაწვდომი ვერსია.</p>
 
   <div class="input-row">
@@ -147,6 +211,14 @@ function fmtSize(bytes){
   return (mb/1024).toFixed(2) + ' GB';
 }
 
+function tierFor(qualityStr, isAudio){
+  if(isAudio) return 'audio';
+  const n = parseInt(String(qualityStr).replace(/[^0-9]/g, ''), 10) || 0;
+  if(n >= 1080) return 'hd';
+  if(n >= 540) return 'mid';
+  return 'low';
+}
+
 async function analyze(){
   const url = document.getElementById('urlInput').value.trim();
   const results = document.getElementById('results');
@@ -165,13 +237,13 @@ async function analyze(){
     const data = await res.json();
 
     if(!res.ok || data.error){
-      results.innerHTML = `<div class="empty status err">${data.error || 'ვერ მოხერხდა ბმულის დამუშავება'}</div>`;
+      results.innerHTML = `<div class="empty err">${escapeHtml(data.error || 'ვერ მოხერხდა ბმულის დამუშავება')}</div>`;
       return;
     }
 
     renderResults(url, data);
   }catch(e){
-    results.innerHTML = '<div class="empty status err">სერვერთან კავშირი ვერ მოხერხდა.</div>';
+    results.innerHTML = '<div class="empty err">სერვერთან კავშირი ვერ მოხერხდა.</div>';
   }finally{
     btn.disabled = false;
   }
@@ -182,18 +254,16 @@ function renderResults(url, data){
   let html = `<div class="video-title">${escapeHtml(data.title || 'მედია ფაილი')}</div>`;
 
   if(data.video && data.video.length){
-    html += `<div class="section-title">ვიდეო (MP4)</div>`;
+    html += `<div class="section-title">ვიდეო · MP4</div>`;
     data.video.forEach((f, i) => {
-      const id = `v_${i}`;
-      html += card(id, f.quality, f.ext, f.filesize, f.has_audio ? null : 'საჭიროა გაერთიანება');
+      html += card(`v_${i}`, f.quality, f.ext, f.filesize, f.has_audio ? null : 'საჭიროა გაერთიანება', false);
     });
   }
 
   if(data.audio && data.audio.length){
-    html += `<div class="section-title">აუდიო (MP3)</div>`;
+    html += `<div class="section-title">აუდიო · MP3</div>`;
     data.audio.forEach((f, i) => {
-      const id = `a_${i}`;
-      html += card(id, f.quality, 'MP3', f.filesize, null);
+      html += card(`a_${i}`, f.quality, 'MP3', f.filesize, null, true);
     });
   }
 
@@ -203,7 +273,6 @@ function renderResults(url, data){
 
   results.innerHTML = html;
 
-  // wire up buttons
   (data.video || []).forEach((f, i) => {
     bindDownload(`v_${i}`, url, 'mp4', f.format_id, f.has_audio);
   });
@@ -212,15 +281,16 @@ function renderResults(url, data){
   });
 }
 
-function card(id, quality, ext, filesize, note){
+function card(id, quality, ext, filesize, note, isAudio){
+  const tier = tierFor(quality, isAudio);
   return `
     <div class="card">
-      <div class="play-dot">▶</div>
+      <div class="play-dot ${tier}">▶</div>
       <div class="meta">
-        <div class="name">${ext?.toUpperCase() || ''} ${filesize ? '• ' + fmtSize(filesize) : ''}</div>
+        <div class="name">${(ext || '').toUpperCase()} ${filesize ? '• ' + fmtSize(filesize) : ''}</div>
         <div class="row">
-          <span class="badge">${quality}</span>
-          ${note ? `<span>${note}</span>` : ''}
+          <span class="badge ${tier}">${escapeHtml(String(quality))}</span>
+          ${note ? `<span>${escapeHtml(note)}</span>` : ''}
         </div>
         <div class="status" id="status_${id}"></div>
       </div>
