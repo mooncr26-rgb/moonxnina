@@ -33,7 +33,7 @@ def background_download(url, file_type, task_id):
         ext = "mp3" if file_type == 'mp3' else "mp4"
         local_filename = os.path.join(TEMP_DIR, f"{task_id}.{ext}")
         
-        # 1. ტიკტოკის ჩამოტვირთვა
+        # 1. TikTok ჩამოტვირთვა
         if "tiktok.com" in url:
             title = download_tiktok_fallback(url, local_filename)
             if title:
@@ -44,30 +44,33 @@ def background_download(url, file_type, task_id):
             else:
                 raise Exception("TikTok სერვერი დროებით მიუწვდომელია.")
 
-        # 2. YouTube ჩამოტვირთვა (გაძლიერებული ლოკალური კონვერტაციით)
+        # 2. YouTube ჩამოტვირთვა
         ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
+        
+        # 👑 ვამოწმებთ ორივე შესაძლო სახელს cookies-ისთვის
+        cookies_name = 'cookies.txt'
+        if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'www.youtube.com_cookies.txt')):
+            cookies_name = 'www.youtube.com_cookies.txt'
+            
+        cookies_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), cookies_name)
         
         opts = {
             'quiet': True,
             'nocheckcertificate': True,
             'outtmpl': os.path.join(TEMP_DIR, f"{task_id}.%(ext)s"),
-            # იყენებს კლიენტის სხვადასხვა იმიტაციას ბლოკის ასავლელად
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web'],
-                    'player_skip': ['configs', 'initial'],
-                }
-            },
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
             }
         }
 
+        # თუ რომელიმე ფაილი იპოვა, გადასცემს ავტორიზაციისთვის
+        if os.path.exists(cookies_path):
+            opts['cookiefile'] = cookies_path
+
         if os.path.exists(os.path.join(ffmpeg_path, 'ffmpeg')):
             opts['ffmpeg_location'] = ffmpeg_path
 
         if file_type == 'mp3':
-            # 👑 უმკაცრესი ინსტრუქცია FFmpeg-ისთვის: აიძულებს ფაილის რეალურ აუდიოდ გადაკეთებას
             opts['format'] = 'bestaudio/best'
             opts['postprocessors'] = [{
                 'key': 'FFmpegExtractAudio',
@@ -81,7 +84,6 @@ def background_download(url, file_type, task_id):
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
             
-            # ვამოწმებთ, რომ FFmpeg-მა მართლა შეცვალა გაფართოება
             if file_type == 'mp3' and not filename.endswith('.mp3'):
                 filename = filename.rsplit('.', 1)[0] + '.mp3'
                 
@@ -90,15 +92,15 @@ def background_download(url, file_type, task_id):
                 download_tasks[task_id]['filename'] = filename
                 download_tasks[task_id]['title'] = info.get('title', 'Media_File')
             else:
-                raise Exception("ფაილის საბოლოო დამუშავება ვერ მოხერხდა.")
+                raise Exception("ფაილის შენახვა ვერ მოხერხდა.")
 
     except Exception as e:
         download_tasks[task_id]['status'] = 'failed'
         err_msg = str(e)
         if "Sign in to confirm" in err_msg or "429" in err_msg:
-            download_tasks[task_id]['error'] = "YouTube ბლოკავს სერვერს. გთხოვთ ატვირთოთ cookies.txt რეპოზიტორიაში."
+            download_tasks[task_id]['error'] = "YouTube ბლოკავს სერვერს. ქუქიები განახლებას საჭიროებს."
         else:
-            download_tasks[task_id]['error'] = "დამუშავების შეცდომა. ხელახლა სცადეთ."
+            download_tasks[task_id]['error'] = f"შეცდომა: {err_msg}"
 
 @app.route('/')
 def index():
@@ -109,7 +111,6 @@ def analyze_video():
     data = request.json or {}
     url = data.get('url', '')
     if not url: return jsonify({"error": "ბმული აკლია"}), 400
-    if "tiktok.com" in url: return jsonify({"title": "TikTok ვიდეო"})
     return jsonify({"title": "მედია ფაილი ნაპოვნია"})
 
 @app.route('/api/download', methods=['POST'])
