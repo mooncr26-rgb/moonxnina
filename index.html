@@ -3,19 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MOONNINA DOWNLOADER - YouTube to MP4 & MP3</title>
+    <title>MOONNINA DOWNLOADER - YouTube & TikTok</title>
     <style>
         :root {
-            --bg-color: #0f172a;
-            --card-bg: #1e293b;
-            --accent: #38bdf8;
-            --accent-hover: #0ea5e9;
-            --text: #f8fafc;
-            --text-muted: #94a3b8;
-            --success: #22c55e;
-            --error: #ef4444;
+            --bg-color: #0f172a; --card-bg: #1e293b; --accent: #38bdf8;
+            --accent-hover: #0ea5e9; --text: #f8fafc; --text-muted: #94a3b8;
+            --success: #22c55e; --error: #ef4444;
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
         body { background-color: var(--bg-color); color: var(--text); line-height: 1.6; padding: 20px; }
         .container { max-width: 800px; margin: 40px auto; }
@@ -25,7 +19,7 @@
         
         .main-card { background: var(--card-bg); padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); margin-bottom: 40px; }
         .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
-        input[type="text"] { flex: 1; padding: 16px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: var(--text); font-size: 1rem; outline: none; }
+        input[type="text"] { flex: 1; padding: 16px; border-radius: 12px; border: 2px solid #334155; background: #0f172a; color: var(--text); font-size: 1rem; outline: none; transition: 0.2s; }
         input[type="text"]:focus { border-color: var(--accent); }
         
         button { padding: 16px 30px; border-radius: 12px; border: none; background: var(--accent); color: #0f172a; font-weight: bold; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
@@ -37,18 +31,17 @@
         .status-box.error { display: block; background: rgba(239, 68, 68, 0.1); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.2); }
         .status-box.success { display: block; background: rgba(34, 197, 94, 0.1); color: var(--success); border: 1px solid rgba(34, 197, 94, 0.2); }
 
-        .formats-section { display: none; margin-top: 25px; }
-        .formats-section h3 { margin-bottom: 15px; color: var(--accent); border-bottom: 1px solid #334155; padding-bottom: 8px; }
-        .format-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 25px; }
+        .result-section { display: none; margin-top: 25px; text-align: center; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        .format-btn { background: #0f172a; border: 1px solid #334155; color: var(--text); padding: 15px; border-radius: 10px; cursor: pointer; text-align: center; display: flex; flex-direction: column; gap: 4px; transition: all 0.2s; }
-        .format-btn:hover { border-color: var(--accent); background: rgba(56, 189, 248, 0.05); }
-        .format-btn .qual { font-weight: bold; font-size: 1.1rem; }
+        .result-title { margin-bottom: 20px; color: var(--text); font-size: 1.1rem; padding-bottom: 10px; border-bottom: 1px solid #334155;}
         
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 40px; }
-        .info-card { background: #1e293b; padding: 20px; border-radius: 12px; }
-        .info-card h4 { color: var(--accent); margin-bottom: 10px; }
-        @media (max-width: 600px) { .input-group { flex-direction: column; } .info-grid { grid-template-columns: 1fr; } }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .dl-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0f172a; border: 2px solid var(--accent); padding: 15px; color: var(--text); border-radius: 12px; text-decoration: none; transition: 0.2s; cursor: pointer; }
+        .dl-btn:hover { background: rgba(56, 189, 248, 0.1); transform: translateY(-2px); }
+        .dl-btn .format { font-size: 1.2rem; font-weight: bold; color: var(--accent); margin-bottom: 5px; }
+        
+        @media (max-width: 600px) { .input-group { flex-direction: column; } .btn-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -56,125 +49,88 @@
 <div class="container">
     <header>
         <h1>MOONNINA DOWNLOADER</h1>
-        <p>სწრაფი და უსაფრთხო YouTube & TikTok კონვერტერი რეკლამების გარეშე.</p>
+        <p>ულტრა-სწრაფი YouTube და TikTok კონვერტერი ლოდინის გარეშე.</p>
     </header>
 
     <div class="main-card">
         <div class="input-group">
-            <input type="text" id="videoUrl" placeholder="ჩასვით YouTube ან TikTok ლინკი აქ...">
-            <button id="convertBtn" onclick="processVideo()">Convert</button>
+            <input type="text" id="videoUrl" placeholder="ჩასვით YouTube ან TikTok ლინკი...">
+            <button id="convertBtn" onclick="analyzeVideo()">ძებნა</button>
         </div>
 
         <div id="statusBox" class="status-box"></div>
 
-        <div id="formatsSection" class="formats-section">
-            <h2 id="videoTitle" style="font-size: 1.2rem; margin-bottom: 20px; text-align: center; color: #fff;">🎯 მედია ფაილი მზად არის</h2>
-            
-            <h3>MP4 ვიდეო ხმით</h3>
-            <div id="videoGrid" class="format-grid"></div>
-
-            <h3>MP3 აუდიო</h3>
-            <div id="audioGrid" class="format-grid"></div>
-        </div>
-    </div>
-
-    <div class="info-grid">
-        <div class="info-card">
-            <h4>როგორ მუშაობს?</h4>
-            <p>ჩასვით ლინკი, დააჭირეთ Convert-ს, აირჩიეთ ფორმატი და გადმოწერა დაიწყება მომენტალურად ბრაუზერში.</p>
-        </div>
-        <div class="info-card">
-            <h4>სრული თავსებადობა</h4>
-            <p>მუშაობს იდეალურად iPhone (Safari), Android (Chrome), Windows და Mac მოწყობილობებზე.</p>
+        <div id="resultSection" class="result-section">
+            <div id="videoTitle" class="result-title"></div>
+            <div class="btn-grid" id="btnGrid"></div>
         </div>
     </div>
 </div>
 
 <script>
-    const statusBox = document.getElementById('statusBox');
-    const convertBtn = document.getElementById('convertBtn');
-    const formatsSection = document.getElementById('formatsSection');
-    const videoGrid = document.getElementById('videoGrid');
-    const audioGrid = document.getElementById('audioGrid');
-
-    function showStatus(text, type) {
-        statusBox.className = `status-box ${type}`;
-        statusBox.innerText = text;
-    }
-
-    // საჯარო კობალტის სერვერები ბლოკირების ასავლელად
-    const COBALT_APIS = [
-        "https://api.cobalt.tools/api/json",
-        "https://cobalt.api.v01.io/api/json",
-        "https://co.wuk.sh/api/json"
-    ];
-
-    async function tryCobalt(url, mode, quality = "720") {
-        const payload = { url: url, videoQuality: quality, downloadMode: mode, audioFormat: "mp3" };
-        
-        for (let api of COBALT_APIS) {
-            try {
-                let response = await fetch(api, {
-                    method: 'POST',
-                    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (response.ok) {
-                    let data = await response.json();
-                    if (data.url) return data.url;
-                }
-            } catch (e) {
-                console.log("სერვერმა უარი თქვა, გადავდივართ შემდეგზე...");
-            }
-        }
-        return null;
-    }
-
-    async function processVideo() {
+    async function analyzeVideo() {
         const url = document.getElementById('videoUrl').value.trim();
+        const btn = document.getElementById('convertBtn');
+        const status = document.getElementById('statusBox');
+        const resultSec = document.getElementById('resultSection');
+        const titleDiv = document.getElementById('videoTitle');
+        const btnGrid = document.getElementById('btnGrid');
+
         if (!url) {
-            showStatus('გთხოვთ ჩასვათ ლინკი!', 'error');
+            status.className = 'status-box error';
+            status.innerText = 'გთხოვთ ჩასვათ ლინკი!';
             return;
         }
 
-        showStatus('მიმდინარეობს ვიდეოს დამუშავება...', 'loading');
-        convertBtn.disabled = true;
-        formatsSection.style.display = 'none';
+        btn.disabled = true;
+        resultSec.style.display = 'none';
+        status.className = 'status-box loading';
+        status.innerText = 'მიმდინარეობს ლინკების გენერაცია სერვერზე...';
 
-        // ვიღებთ ვიდეო და აუდიო ლინკებს პირდაპირ კლიენტის ბრაუზერიდან
-        const videoUrl = await tryCobalt(url, "regular", "720");
-        const audioUrl = await tryCobalt(url, "audio");
+        try {
+            const res = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            });
+            const data = await res.json();
 
-        if (!videoUrl && !audioUrl) {
-            showStatus('ვიდეოს წაკითხვა ვერ მოხერხდა. გთხოვთ შეამოწმოთ ლინკი ან სცადოთ სხვა ვიდეო.', 'error');
-            convertBtn.disabled = false;
-            return;
+            if (!res.ok || data.error) {
+                status.className = 'status-box error';
+                status.innerText = data.error || 'მოხდა შეცდომა მონაცემების დამუშავებისას.';
+                btn.disabled = false;
+                return;
+            }
+
+            status.style.display = 'none';
+            titleDiv.innerText = data.title;
+            btnGrid.innerHTML = '';
+
+            if (data.mp4) {
+                btnGrid.innerHTML += `
+                    <a href="${data.mp4}" target="_blank" class="dl-btn">
+                        <span class="format">🎥 გადმოწერა (MP4)</span>
+                        <span style="font-size:0.85rem; color:var(--text-muted)">ვიდეო ხმით (HD)</span>
+                    </a>
+                `;
+            }
+            if (data.mp3) {
+                btnGrid.innerHTML += `
+                    <a href="${data.mp3}" target="_blank" class="dl-btn" style="border-color: #22c55e;">
+                        <span class="format" style="color: #22c55e;">🎵 გადმოწერა (MP3)</span>
+                        <span style="font-size:0.85rem; color:var(--text-muted)">მხოლოდ აუდიო ფაილი</span>
+                    </a>
+                `;
+            }
+
+            resultSec.style.display = 'block';
+
+        } catch (err) {
+            status.className = 'status-box error';
+            status.innerText = 'სერვერთან კავშირი გაწყდა.';
+        } finally {
+            btn.disabled = false;
         }
-
-        videoGrid.innerHTML = '';
-        audioGrid.innerHTML = '';
-
-        if (videoUrl) {
-            videoGrid.innerHTML = `
-                <button class="format-btn" onclick="window.open('${videoUrl}', '_blank')">
-                    <span class="qual">HD ხარისხი (MP4)</span>
-                    <span style="font-size:0.8rem; color:var(--text-muted)">🔊 ხმით სრული ვერსია</span>
-                </button>
-            `;
-        }
-
-        if (audioUrl) {
-            audioGrid.innerHTML = `
-                <button class="format-btn" onclick="window.open('${audioUrl}', '_blank')">
-                    <span class="qual">საუკეთესო MP3</span>
-                    <span style="font-size:0.8rem; color:var(--text-muted)">🎵 მხოლოდ აუდიო ფაილი</span>
-                </button>
-            `;
-        }
-
-        showStatus('ფაილები წარმატებით მომზადდა!', 'success');
-        formatsSection.style.display = 'block';
-        convertBtn.disabled = false;
     }
 </script>
 
