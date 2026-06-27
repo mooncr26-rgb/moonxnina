@@ -1,6 +1,7 @@
 import os
 import threading
 import uuid
+import traceback
 import requests
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
@@ -14,62 +15,136 @@ os.makedirs(TEMP_DIR, exist_ok=True)
 
 download_tasks = {}
 
-def get_clean_youtube_id(url):
-    if "youtu.be/" in url: return url.split("youtu.be/")[-1].split("?")[0]
-    if "v=" in url: return url.split("v=")[-1].split("&")[0]
+USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+              '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36')
+
+
+def get_cookies_path():
+    base = os.path.dirname(os.path.abspath(__file__))
+    p1 = os.path.join(base, 'www.youtube.com_cookies.txt')
+    p2 = os.path.join(base, 'cookies.txt')
+    if os.path.exists(p1):
+        return p1
+    if os.path.exists(p2):
+        return p2
     return None
+
+
+def get_ffmpeg_path():
+    base = os.path.dirname(os.path.abspath(__file__))
+    candidate = os.path.join(base, 'ffmpeg', 'ffmpeg')
+    if os.path.exists(candidate):
+        return os.path.join(base, 'ffmpeg')
+    return None
+
+
+def get_clean_youtube_id(url):
+    if "youtu.be/" in url:
+        return url.split("youtu.be/")[-1].split("?")[0]
+    if "v=" in url:
+        return url.split("v=")[-1].split("&")[0]
+    return None
+
+
+def base_ydl_opts():
+    opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'nocheckcertificate': True,
+        'http_headers': {'User-Agent': USER_AGENT},
+    }
+    cookies_path = get_cookies_path()
+    if cookies_path:
+        opts['cookiefile'] = cookies_path
+    ffmpeg_path = get_ffmpeg_path()
+    if ffmpeg_path:
+        opts['ffmpeg_location'] = ffmpeg_path
+    return opts
+
+
+# ---------------------------------------------------------------------------
+# TikTok fallback
+# ---------------------------------------------------------------------------
 
 def download_tiktok_fallback(url, local_filename):
     try:
         api_url = "https://www.tikwm.com/api/"
-        res = requests.post(api_url, data={'url': url}).json()
+        res = requests.post(api_url, data={'url': url}, timeout=20).json()
         if res.get('code') == 0:
             video_url = res['data']['play']
             video_bytes = requests.get(video_url, timeout=30).content
             with open(local_filename, 'wb') as f:
                 f.write(video_bytes)
             return res['data'].get('title', 'TikTok_Video')
+        print(f"[TikTok] API returned code={res.get('code')} msg={res.get('msg')}")
     except Exception as e:
-        print(f"TikTok Error: {e}")
+        print(f"[TikTok] Error: {e}")
     return None
 
+
+def get_tiktok_info(url):
+    """Used by /api/formats — returns title + a single direct-download option."""
+    try:
+        res = requests.post("https://www.tikwm.com/api/", data={'url': url}, timeout=20).json()
+        if res.get('code') == 0:
+            data = res['data']
+            size = data.get('size') or data.get('hd_size')
+            return {
+                "title": data.get('title', 'TikTok ვიდეო'),
+                "video": [{
+                    "format_id": "tiktok_direct",
+                    "quality": "Original (no watermark)",
+                    "ext": "mp4",
+                    "filesize": size,
+                    "has_audio": True,
+                }],
+                "audio": []
+            }
+    except Exception as e:
+        print(f"[TikTok formats] Error: {e}")
+    return None
+
+
+# ---------------------------------------------------------------------------
+# YouTube proxy fallback (best-effort — public mirrors go down/rotate often)
+# ---------------------------------------------------------------------------
+
 def download_youtube_proxy_fallback(yt_id, file_type, local_filename):
-    """ 
-    YouTube ბლოკის ავლით ჩამოტვირთვა უახლესი, დაუბლოკავი საჯარო პროქსი-სერვერების ქსელით
-    """
     instances = [
         "https://pipedapi.kavin.rocks/streams/",
         "https://pipedapi.colby.moe/streams/",
         "https://api.piped.yt/streams/",
         "https://pipedapi.us.to/streams/"
     ]
-    
+
     for base_url in instances:
         try:
             res = requests.get(f"{base_url}{yt_id}", timeout=10).json()
-            
-            if file_type == "mp3" and "audioStreams" in res:
+
+            if file_type == "mp3" and "audioStreams" in res and res["audioStreams"]:
                 audio_url = res["audioStreams"][0]["url"]
                 r = requests.get(audio_url, timeout=45)
                 if r.status_code == 200:
-                    with open(local_filename, 'wb') as f: f.write(r.content)
+                    with open(local_filename, 'wb') as f:
+                        f.write(r.content)
                     return True
-                    
-            elif file_type == "mp4" and "videoStreams" in res:
-                # ვეძებთ ვიდეოს, რომელსაც ხმაც მოჰყვება (videoOnly: False)
+
+            elif file_type == "mp4" and "videoStreams" in res and res["videoStreams"]:
                 streams = [s for s in res["videoStreams"] if not s.get("videoOnly")]
-                if not streams: streams = res["videoStreams"]
+                if not streams:
+                    streams = res["videoStreams"]
                 if streams:
                     video_url = streams[0]["url"]
                     r = requests.get(video_url, timeout=60)
                     if r.status_code == 200:
-                        with open(local_filename, 'wb') as f: f.write(r.content)
+                        with open(local_filename, 'wb') as f:
+                            f.write(r.content)
                         return True
-        except:
+        except Exception as e:
+            print(f"[Piped:{base_url}] failed: {e}")
             continue
-            
-    # მესამე ალტერნატივა: პირდაპირი საჯარო კონვერტორები
-    gateways = ["https://co.wuk.sh/api/json", "https://api.cobalt.tools/"]
+
+    gateways = ["https://api.cobalt.tools/api/json"]
     payload = {
         "url": f"https://www.youtube.com/watch?v={yt_id}",
         "videoQuality": "720",
@@ -77,22 +152,114 @@ def download_youtube_proxy_fallback(yt_id, file_type, local_filename):
     }
     for api_url in gateways:
         try:
-            r_cobalt = requests.post(api_url, json=payload, headers={"Accept": "application/json", "Content-Type": "application/json"}, timeout=10).json()
+            r_cobalt = requests.post(
+                api_url, json=payload,
+                headers={"Accept": "application/json", "Content-Type": "application/json"},
+                timeout=15
+            ).json()
             if "url" in r_cobalt:
                 file_bytes = requests.get(r_cobalt["url"], timeout=60).content
-                with open(local_filename, 'wb') as f: f.write(file_bytes)
+                with open(local_filename, 'wb') as f:
+                    f.write(file_bytes)
                 return True
-        except:
+            print(f"[Cobalt] no url in response: {r_cobalt}")
+        except Exception as e:
+            print(f"[Cobalt:{api_url}] failed: {e}")
             continue
-            
+
     return False
 
-def background_download(url, file_type, task_id):
+
+# ---------------------------------------------------------------------------
+# Format listing — powers the "show every available quality" UI
+# ---------------------------------------------------------------------------
+
+@app.route('/api/formats', methods=['POST'])
+def get_formats():
+    data = request.json or {}
+    url = data.get('url', '').strip()
+    if not url:
+        return jsonify({"error": "ბმული არ მოწოდებულა"}), 400
+
+    if "tiktok.com" in url:
+        info = get_tiktok_info(url)
+        if info:
+            return jsonify(info)
+        return jsonify({"error": "TikTok ვიდეოს ინფორმაცია ვერ მოიძებნა"}), 502
+
+    ydl_opts = base_ydl_opts()
+    ydl_opts['skip_download'] = True
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except Exception as e:
+        print(f"[formats] extract_info failed: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "error": "ვიდეოს ინფორმაციის წაკითხვა ვერ მოხერხდა. "
+                     "შესაძლოა YouTube-მა დროებით დაბლოკა სერვერის IP, "
+                     "ან ვიდეო არ არსებობს/პრივატულია."
+        }), 502
+
+    video_list = []
+    audio_list = []
+    seen = set()
+
+    for f in info.get('formats', []):
+        height = f.get('height')
+        vcodec = f.get('vcodec', 'none')
+        acodec = f.get('acodec', 'none')
+        ext = f.get('ext')
+        filesize = f.get('filesize') or f.get('filesize_approx')
+
+        if vcodec and vcodec != 'none' and height:
+            key = ('v', height, ext)
+            if key in seen:
+                continue
+            seen.add(key)
+            video_list.append({
+                "format_id": f.get('format_id'),
+                "quality": f"{height}p",
+                "height": height,
+                "ext": ext,
+                "filesize": filesize,
+                "has_audio": acodec not in (None, 'none'),
+                "protocol": f.get('protocol', ''),
+            })
+        elif (not vcodec or vcodec == 'none') and acodec and acodec != 'none':
+            abr = f.get('abr') or 0
+            key = ('a', round(abr), ext)
+            if key in seen:
+                continue
+            seen.add(key)
+            audio_list.append({
+                "format_id": f.get('format_id'),
+                "quality": f"{int(abr)}kbps" if abr else "Audio",
+                "ext": ext,
+                "filesize": filesize,
+            })
+
+    video_list.sort(key=lambda x: x['height'] or 0, reverse=True)
+    audio_list.sort(key=lambda x: x['filesize'] or 0, reverse=True)
+
+    return jsonify({
+        "title": info.get('title', 'მედია ფაილი'),
+        "video": video_list[:8],
+        "audio": audio_list[:4],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Background download
+# ---------------------------------------------------------------------------
+
+def background_download(url, file_type, task_id, format_id=None, has_audio=True):
     try:
         ext = "mp3" if file_type == 'mp3' else "mp4"
         local_filename = os.path.join(TEMP_DIR, f"{task_id}.{ext}")
-        
-        # 1. TikTok ჩამოტვირთვა
+
+        # 1. TikTok
         if "tiktok.com" in url:
             title = download_tiktok_fallback(url, local_filename)
             if title:
@@ -103,55 +270,50 @@ def background_download(url, file_type, task_id):
             else:
                 raise Exception("TikTok სერვერი დროებით მიუწვდომელია.")
 
-        # 2. YouTube ჩამოტვირთვა
+        # 2. YouTube / other yt-dlp-supported sites
         yt_id = get_clean_youtube_id(url)
-        ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
-        cookies_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'www.youtube.com_cookies.txt')
-        if not os.path.exists(cookies_path):
-            cookies_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cookies.txt')
-        
-        opts = {
-            'quiet': True,
-            'nocheckcertificate': True,
-            'outtmpl': os.path.join(TEMP_DIR, f"{task_id}.%(ext)s"),
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-            }
-        }
-
-        if os.path.exists(cookies_path):
-            opts['cookiefile'] = cookies_path
-        if os.path.exists(os.path.join(ffmpeg_path, 'ffmpeg')):
-            opts['ffmpeg_location'] = os.path.join(ffmpeg_path, 'ffmpeg')
+        opts = base_ydl_opts()
+        opts['outtmpl'] = os.path.join(TEMP_DIR, f"{task_id}.%(ext)s")
 
         if file_type == 'mp3':
-            opts['format'] = 'bestaudio/best'
-            opts['postprocessors'] = [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '320'}]
+            opts['format'] = format_id if format_id else 'bestaudio/best'
+            opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '320'
+            }]
         else:
-            opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+            if format_id:
+                opts['format'] = format_id if has_audio else f"{format_id}+bestaudio/best"
+            else:
+                opts['format'] = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
             opts['merge_output_format'] = 'mp4'
 
         try:
-            # ვცდილობთ ჩვეულებრივად (ლოკალურად)
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 filename = ydl.prepare_filename(info)
-                
+
                 if file_type == 'mp3' and not filename.endswith('.mp3'):
                     filename = filename.rsplit('.', 1)[0] + '.mp3'
                 elif file_type == 'mp4' and not filename.endswith('.mp4'):
                     base_name = filename.rsplit('.', 1)[0]
-                    if os.path.exists(base_name + '.mp4'): filename = base_name + '.mp4'
-                
+                    if os.path.exists(base_name + '.mp4'):
+                        filename = base_name + '.mp4'
+
                 if os.path.exists(filename):
                     download_tasks[task_id]['status'] = 'completed'
                     download_tasks[task_id]['filename'] = filename
                     download_tasks[task_id]['title'] = info.get('title', 'Media_File')
                     return
                 else:
-                    raise Exception()
-        except:
-            # 👑 თუ ლოკალურმა გზამ/ქუქიებმა უარი თქვა ბლოკის გამო, გადავდივართ მულტი-პროქსი ქსელზე
+                    raise Exception("yt-dlp-მა დასრულდა შეცდომის გარეშე, მაგრამ ფაილი არ შეიქმნა.")
+        except Exception as e:
+            # Log the REAL reason instead of swallowing it — this is what was
+            # hiding the actual cause of every YouTube failure.
+            print(f"[yt-dlp] local download failed for task {task_id}: {e}")
+            traceback.print_exc()
+
             if yt_id:
                 success = download_youtube_proxy_fallback(yt_id, file_type, local_filename)
                 if success:
@@ -159,45 +321,70 @@ def background_download(url, file_type, task_id):
                     download_tasks[task_id]['filename'] = local_filename
                     download_tasks[task_id]['title'] = f"YouTube_{yt_id}"
                     return
-            raise Exception("ჩამოტვირთვა ვერ მოხერხდა. სცადეთ სხვა ვიდეოს ლინკი.")
+            raise Exception(
+                "ჩამოტვირთვა ვერ მოხერხდა (YouTube-მა შესაძლოა დაბლოკა სერვერის IP). "
+                "სცადეთ cookies.txt-ის განახლება ან სხვა ვიდეო."
+            )
 
     except Exception as e:
         download_tasks[task_id]['status'] = 'failed'
         download_tasks[task_id]['error'] = str(e)
 
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
 @app.route('/')
 def index():
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'index.html')
 
+
 @app.route('/api/analyze', methods=['POST'])
 def analyze_video():
+    # Kept for backwards compatibility with old frontend calls.
     return jsonify({"title": "მედია ფაილი ნაპოვნია"})
+
 
 @app.route('/api/download', methods=['POST'])
 def start_download():
     data = request.json or {}
     url = data.get('url')
     file_type = data.get('type')
+    format_id = data.get('format_id')
+    has_audio = data.get('has_audio', True)
+
+    if not url or not file_type:
+        return jsonify({"error": "url და type სავალდებულოა"}), 400
+
     task_id = str(uuid.uuid4())
     download_tasks[task_id] = {'progress': 50, 'status': 'processing', 'filename': ''}
-    
-    thread = threading.Thread(target=background_download, args=(url, file_type, task_id))
+
+    thread = threading.Thread(
+        target=background_download,
+        args=(url, file_type, task_id, format_id, has_audio)
+    )
     thread.start()
     return jsonify({"task_id": task_id})
+
 
 @app.route('/api/progress/<task_id>', methods=['GET'])
 def get_progress(task_id):
     task = download_tasks.get(task_id)
-    if not task: return jsonify({"error": "ვერ მოიძებნა"}), 404
+    if not task:
+        return jsonify({"error": "ვერ მოიძებნა"}), 404
     return jsonify(task)
+
 
 @app.route('/api/get_file/<task_id>', methods=['GET'])
 def get_file(task_id):
     task = download_tasks.get(task_id)
-    if not task or task['status'] != 'completed': return "არ არის მზად", 400
-    safe_title = "".join([c for c in task['title'] if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+    if not task or task['status'] != 'completed':
+        return "არ არის მზად", 400
+    safe_title = "".join([c for c in task['title'] if c.isalpha() or c.isdigit() or c == ' ']).rstrip()
     ext = task['filename'].split('.')[-1]
     return send_file(task['filename'], as_attachment=True, download_name=f"{safe_title or 'media'}.{ext}")
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
