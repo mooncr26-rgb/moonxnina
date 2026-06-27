@@ -46,6 +46,14 @@ def get_clean_youtube_id(url):
     return None
 
 
+PIPED_INSTANCES = [
+    "https://pipedapi.kavin.rocks/streams/",
+    "https://pipedapi.colby.moe/streams/",
+    "https://api.piped.yt/streams/",
+    "https://pipedapi.us.to/streams/"
+]
+
+
 def base_ydl_opts():
     opts = {
         'quiet': True,
@@ -59,6 +67,13 @@ def base_ydl_opts():
     ffmpeg_path = get_ffmpeg_path()
     if ffmpeg_path:
         opts['ffmpeg_location'] = ffmpeg_path
+    # Render/most cloud hosts use datacenter IPs that YouTube blocks far more
+    # aggressively than home IPs. If you have access to a proxy (residential
+    # or otherwise), set YTDLP_PROXY as an env var on Render and yt-dlp will
+    # route through it automatically.
+    proxy = os.environ.get('YTDLP_PROXY')
+    if proxy:
+        opts['proxy'] = proxy
     return opts
 
 
@@ -110,14 +125,7 @@ def get_tiktok_info(url):
 # ---------------------------------------------------------------------------
 
 def download_youtube_proxy_fallback(yt_id, file_type, local_filename):
-    instances = [
-        "https://pipedapi.kavin.rocks/streams/",
-        "https://pipedapi.colby.moe/streams/",
-        "https://api.piped.yt/streams/",
-        "https://pipedapi.us.to/streams/"
-    ]
-
-    for base_url in instances:
+    for base_url in PIPED_INSTANCES:
         try:
             res = requests.get(f"{base_url}{yt_id}", timeout=10).json()
 
@@ -170,6 +178,54 @@ def download_youtube_proxy_fallback(yt_id, file_type, local_filename):
     return False
 
 
+def get_youtube_formats_via_piped(yt_id):
+    """Used by /api/formats when yt-dlp itself is blocked. Returns direct
+    stream URLs (prefixed so background_download knows to fetch them with
+    plain requests instead of yt-dlp)."""
+    for base_url in PIPED_INSTANCES:
+        try:
+            res = requests.get(f"{base_url}{yt_id}", timeout=10).json()
+            title = res.get('title', 'YouTube ვიდეო')
+
+            video_list, audio_list, seen = [], [], set()
+
+            for s in res.get('videoStreams', []):
+                quality = s.get('quality')
+                stream_url = s.get('url')
+                if not quality or not stream_url:
+                    continue
+                if quality in seen:
+                    continue
+                seen.add(quality)
+                video_list.append({
+                    "format_id": f"pipedurl:{stream_url}",
+                    "quality": quality,
+                    "ext": (s.get('format') or 'mp4').lower(),
+                    "filesize": None,
+                    "has_audio": not s.get('videoOnly', False),
+                    "protocol": "piped",
+                })
+
+            for s in res.get('audioStreams', []):
+                stream_url = s.get('url')
+                if not stream_url:
+                    continue
+                quality = s.get('quality') or 'Audio'
+                audio_list.append({
+                    "format_id": f"pipedurl:{stream_url}",
+                    "quality": str(quality),
+                    "ext": (s.get('format') or 'm4a').lower(),
+                    "filesize": None,
+                })
+
+            if video_list or audio_list:
+                return {"title": title, "video": video_list[:8], "audio": audio_list[:4]}
+        except Exception as e:
+            print(f"[Piped formats:{base_url}] failed: {e}")
+            continue
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Format listing — powers the "show every available quality" UI
 # ---------------------------------------------------------------------------
@@ -196,6 +252,13 @@ def get_formats():
     except Exception as e:
         print(f"[formats] extract_info failed: {e}")
         traceback.print_exc()
+
+        yt_id = get_clean_youtube_id(url)
+        if yt_id:
+            fallback = get_youtube_formats_via_piped(yt_id)
+            if fallback:
+                return jsonify(fallback)
+
         return jsonify({
             "error": "ვიდეოს ინფორმაციის წაკითხვა ვერ მოხერხდა. "
                      "შესაძლოა YouTube-მა დროებით დაბლოკა სერვერის IP, "
@@ -270,7 +333,24 @@ def background_download(url, file_type, task_id, format_id=None, has_audio=True)
             else:
                 raise Exception("TikTok სერვერი დროებით მიუწვდომელია.")
 
-        # 2. YouTube / other yt-dlp-supported sites
+        # 2. Direct stream URL handed back by the Piped fallback in /api/formats
+        if format_id and format_id.startswith("pipedurl:"):
+            stream_url = format_id[len("pipedurl:"):]
+            try:
+                r = requests.get(stream_url, timeout=90, headers={'User-Agent': USER_AGENT})
+                if r.status_code == 200:
+                    with open(local_filename, 'wb') as f:
+                        f.write(r.content)
+                    download_tasks[task_id]['status'] = 'completed'
+                    download_tasks[task_id]['filename'] = local_filename
+                    download_tasks[task_id]['title'] = f"YouTube_{get_clean_youtube_id(url) or task_id}"
+                    return
+                raise Exception(f"Piped stream returned status {r.status_code}")
+            except Exception as e:
+                print(f"[pipedurl] direct download failed: {e}")
+                raise Exception("ამ ხარისხის ჩამოტვირთვა ვერ მოხერხდა, სცადეთ სხვა ხარისხი.")
+
+        # 3. YouTube / other yt-dlp-supported sites
         yt_id = get_clean_youtube_id(url)
         opts = base_ydl_opts()
         opts['outtmpl'] = os.path.join(TEMP_DIR, f"{task_id}.%(ext)s")
