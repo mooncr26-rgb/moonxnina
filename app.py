@@ -47,7 +47,6 @@ def background_download(url, file_type, task_id):
         # 2. YouTube ჩამოტვირთვა
         ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ffmpeg')
         
-        # 👑 ვამოწმებთ ორივე შესაძლო სახელს cookies-ისთვის
         cookies_name = 'cookies.txt'
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'www.youtube.com_cookies.txt')):
             cookies_name = 'www.youtube.com_cookies.txt'
@@ -63,7 +62,6 @@ def background_download(url, file_type, task_id):
             }
         }
 
-        # თუ რომელიმე ფაილი იპოვა, გადასცემს ავტორიზაციისთვის
         if os.path.exists(cookies_path):
             opts['cookiefile'] = cookies_path
 
@@ -78,21 +76,26 @@ def background_download(url, file_type, task_id):
                 'preferredquality': '320'
             }]
         else:
-            opts['format'] = 'best[ext=mp4]/best'
+            # 👑 ვეუბნებით, რომ გადმოწეროს საუკეთესო ვიდეო + საუკეთესო აუდიო და გადაიყვანოს MP4-ში
+            opts['format'] = 'bv*+ba/b'
+            opts['merge_output_format'] = 'mp4'
 
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
             
+            # გაფართოებების დაზღვევა
             if file_type == 'mp3' and not filename.endswith('.mp3'):
                 filename = filename.rsplit('.', 1)[0] + '.mp3'
+            elif file_type == 'mp4' and not filename.endswith('.mp4'):
+                filename = filename.rsplit('.', 1)[0] + '.mp4'
                 
             if os.path.exists(filename):
                 download_tasks[task_id]['status'] = 'completed'
                 download_tasks[task_id]['filename'] = filename
                 download_tasks[task_id]['title'] = info.get('title', 'Media_File')
             else:
-                raise Exception("ფაილის შენახვა ვერ მოხერხდა.")
+                raise Exception("ფაილის საბოლოო ფორმატში შენახვა ვერ მოხერხდა.")
 
     except Exception as e:
         download_tasks[task_id]['status'] = 'failed'
