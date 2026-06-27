@@ -1,260 +1,291 @@
 <!DOCTYPE html>
 <html lang="ka">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MOONXNINA DOWNLOADER</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        
-        body {
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #060213;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            overflow-x: hidden;
-            perspective: 1000px;
-            padding: 20px;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Media Downloader</title>
+<style>
+  :root{
+    --bg:#0d0f14;
+    --card:#171a21;
+    --card-border:#262b35;
+    --text:#e8eaed;
+    --muted:#8b93a3;
+    --accent:#3b82f6;
+    --accent-hover:#2f6fdb;
+    --ok:#22c55e;
+    --err:#ef4444;
+    --tag:#f59e0b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:24px 16px 80px;
+  }
+  .wrap{max-width:640px;margin:0 auto;}
+  h1{font-size:20px;margin:0 0 4px;}
+  p.sub{color:var(--muted);margin:0 0 20px;font-size:14px;}
+  .input-row{display:flex;gap:8px;margin-bottom:24px;}
+  input[type=text]{
+    flex:1;
+    padding:13px 14px;
+    border-radius:10px;
+    border:1px solid var(--card-border);
+    background:var(--card);
+    color:var(--text);
+    font-size:14px;
+    outline:none;
+  }
+  input[type=text]:focus{border-color:var(--accent);}
+  button.primary{
+    padding:13px 20px;
+    border-radius:10px;
+    border:none;
+    background:var(--accent);
+    color:#fff;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+  }
+  button.primary:hover{background:var(--accent-hover);}
+  button.primary:disabled{opacity:.5;cursor:default;}
 
-        .orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(40px);
-            z-index: 1;
-            animation: float 8s infinite ease-in-out;
-            opacity: 0.6;
-        }
-        .orb-1 {
-            width: 250px; height: 250px;
-            background: radial-gradient(circle, #ff007f, #7928ca);
-            top: -10%; left: -10%;
-        }
-        .orb-2 {
-            width: 250px; height: 250px;
-            background: radial-gradient(circle, #00f2fe, #4facfe);
-            bottom: -10%; right: -10%;
-            animation-delay: -4s;
-        }
+  .section-title{
+    font-size:13px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    margin:22px 0 10px;
+  }
+  .video-title{font-size:15px;font-weight:600;margin:0 0 14px;color:var(--text);}
 
-        @keyframes float {
-            0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-20px) scale(1.1); }
-        }
+  .card{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:12px;
+    padding:12px 14px;
+    margin-bottom:10px;
+  }
+  .play-dot{
+    width:34px;height:34px;border-radius:50%;
+    background:#222736;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+    color:var(--accent);
+    font-size:14px;
+  }
+  .meta{flex:1;min-width:0;}
+  .meta .name{
+    font-size:13px;color:var(--text);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    margin-bottom:4px;
+  }
+  .meta .row{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);}
+  .badge{
+    background:var(--tag);
+    color:#1a1300;
+    font-weight:700;
+    font-size:11px;
+    padding:2px 7px;
+    border-radius:5px;
+  }
+  .dl-btn{
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    padding:9px 16px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    flex-shrink:0;
+    white-space:nowrap;
+  }
+  .dl-btn:hover{background:var(--accent-hover);}
+  .dl-btn:disabled{opacity:.6;cursor:default;}
 
-        .container {
-            position: relative;
-            z-index: 10;
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            padding: 30px 20px;
-            border-radius: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            text-align: center;
-            width: 100%;
-            max-width: 450px;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
-        }
-
-        h1 {
-            font-size: 1.8rem;
-            margin-bottom: 25px;
-            background: linear-gradient(45deg, #00f2fe, #ff007f);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .input-wrapper { margin-bottom: 20px; }
-        input {
-            width: 100%; padding: 16px; border-radius: 14px; border: none;
-            background: rgba(255, 255, 255, 0.07); color: white;
-            font-size: 1rem; outline: none;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            text-align: center;
-        }
-        input:focus { border-color: #00f2fe; box-shadow: 0 0 15px rgba(0, 242, 254, 0.3); }
-
-        .main-btn {
-            width: 100%; padding: 16px; border-radius: 14px; border: none;
-            background: linear-gradient(135deg, #7928ca, #ff007f); color: white;
-            font-weight: bold; font-size: 1.1rem; cursor: pointer;
-            box-shadow: 0 6px 0 #52168c; transition: 0.1s;
-        }
-        .main-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #52168c; }
-
-        #status { margin-top: 20px; font-size: 0.95rem; color: #00f2fe; font-weight: 500; min-height: 24px; word-break: break-word; }
-
-        .progress-container {
-            display: none;
-            margin-top: 20px;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 15px;
-            border-radius: 14px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .progress-bar-bg {
-            width: 100%; height: 12px; background: rgba(0, 0, 0, 0.4);
-            border-radius: 6px; overflow: hidden; margin-top: 8px; position: relative;
-        }
-        .progress-bar-fill {
-            width: 0%; height: 100%;
-            background: linear-gradient(90deg, #00f2fe, #ff007f);
-            box-shadow: 0 0 10px #00f2fe;
-            transition: width 0.2s ease;
-        }
-
-        .links { margin-top: 25px; display: flex; flex-direction: column; gap: 15px; }
-        .btn {
-            width: 100%; padding: 16px; border: none; border-radius: 14px;
-            font-weight: bold; font-size: 1rem; color: white; cursor: pointer;
-            transition: all 0.1s ease;
-        }
-        .btn:disabled { background: #444 !important; box-shadow: none !important; cursor: not-allowed; opacity: 0.6; }
-        
-        .mp4 { background: linear-gradient(135deg, #00cdac, #02aab0); box-shadow: 0 6px 0 #01767a; }
-        .mp4:not(:disabled):active { transform: translateY(4px); box-shadow: 0 2px 0 #01767a; }
-
-        .mp3 { background: linear-gradient(135deg, #ffb300, #ff8000); box-shadow: 0 6px 0 #b35900; }
-        .mp3:not(:disabled):active { transform: translateY(4px); box-shadow: 0 2px 0 #b35900; }
-    </style>
+  .status{font-size:13px;margin-top:6px;}
+  .status.err{color:var(--err);}
+  .status.ok{color:var(--ok);}
+  .empty{color:var(--muted);font-size:14px;text-align:center;padding:40px 0;}
+  .spinner{
+    width:16px;height:16px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.4);
+    border-top-color:#fff;
+    display:inline-block;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
 </head>
 <body>
+<div class="wrap">
+  <h1>ვიდეო / აუდიო ჩამოტვირთვა</h1>
+  <p class="sub">ჩასვი YouTube ან TikTok ბმული — გამოჩნდება ყველა ხელმისაწვდომი ვერსია.</p>
 
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
+  <div class="input-row">
+    <input id="urlInput" type="text" placeholder="https://youtube.com/watch?v=..." />
+    <button class="primary" id="analyzeBtn" onclick="analyze()">ძებნა</button>
+  </div>
 
-    <div class="container">
-        <h1>MOONXNINA DOWNLOADER</h1>
-        <div class="input-wrapper">
-            <input type="text" id="url" placeholder="ჩასვი ვიდეოს ბმული აქ...">
+  <div id="results"></div>
+</div>
+
+<script>
+const API = ''; // იმავე დომენზეა Flask-ი, თუ ცალკეა — ჩაწერე backend-ის URL
+
+function fmtSize(bytes){
+  if(!bytes) return '';
+  const mb = bytes / (1024*1024);
+  if(mb < 1024) return mb.toFixed(1) + ' MB';
+  return (mb/1024).toFixed(2) + ' GB';
+}
+
+async function analyze(){
+  const url = document.getElementById('urlInput').value.trim();
+  const results = document.getElementById('results');
+  const btn = document.getElementById('analyzeBtn');
+  if(!url){ return; }
+
+  btn.disabled = true;
+  results.innerHTML = '<div class="empty"><span class="spinner"></span> ვამოწმებ ბმულს...</div>';
+
+  try{
+    const res = await fetch(API + '/api/formats', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({url})
+    });
+    const data = await res.json();
+
+    if(!res.ok || data.error){
+      results.innerHTML = `<div class="empty status err">${data.error || 'ვერ მოხერხდა ბმულის დამუშავება'}</div>`;
+      return;
+    }
+
+    renderResults(url, data);
+  }catch(e){
+    results.innerHTML = '<div class="empty status err">სერვერთან კავშირი ვერ მოხერხდა.</div>';
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function renderResults(url, data){
+  const results = document.getElementById('results');
+  let html = `<div class="video-title">${escapeHtml(data.title || 'მედია ფაილი')}</div>`;
+
+  if(data.video && data.video.length){
+    html += `<div class="section-title">ვიდეო (MP4)</div>`;
+    data.video.forEach((f, i) => {
+      const id = `v_${i}`;
+      html += card(id, f.quality, f.ext, f.filesize, f.has_audio ? null : 'საჭიროა გაერთიანება');
+    });
+  }
+
+  if(data.audio && data.audio.length){
+    html += `<div class="section-title">აუდიო (MP3)</div>`;
+    data.audio.forEach((f, i) => {
+      const id = `a_${i}`;
+      html += card(id, f.quality, 'MP3', f.filesize, null);
+    });
+  }
+
+  if(!data.video?.length && !data.audio?.length){
+    html += '<div class="empty">ამ ბმულისთვის ფორმატები ვერ მოიძებნა.</div>';
+  }
+
+  results.innerHTML = html;
+
+  // wire up buttons
+  (data.video || []).forEach((f, i) => {
+    bindDownload(`v_${i}`, url, 'mp4', f.format_id, f.has_audio);
+  });
+  (data.audio || []).forEach((f, i) => {
+    bindDownload(`a_${i}`, url, 'mp3', f.format_id, true);
+  });
+}
+
+function card(id, quality, ext, filesize, note){
+  return `
+    <div class="card">
+      <div class="play-dot">▶</div>
+      <div class="meta">
+        <div class="name">${ext?.toUpperCase() || ''} ${filesize ? '• ' + fmtSize(filesize) : ''}</div>
+        <div class="row">
+          <span class="badge">${quality}</span>
+          ${note ? `<span>${note}</span>` : ''}
         </div>
-        <button class="main-btn" id="searchBtn" onclick="analyze()">ვიდეოს მოძიება</button>
-        
-        <div id="status"></div>
+        <div class="status" id="status_${id}"></div>
+      </div>
+      <button class="dl-btn" id="btn_${id}">ჩამოტვირთვა</button>
+    </div>`;
+}
 
-        <div class="progress-container" id="progressContainer">
-            <div style="display: flex; justify-content: space-between; color: white; font-size: 0.85rem;">
-                <span id="progressState">ამუშავებს...</span>
-                <span id="progressPercent">0%</span>
-            </div>
-            <div class="progress-bar-bg">
-                <div class="progress-bar-fill" id="progressBarFill"></div>
-            </div>
-        </div>
-        
-        <div id="links" class="links" style="display: none;">
-            <button class="btn mp4" id="mp4Btn" onclick="startDownload('mp4')">🎬 გადმოწერე ორიგინალი MP4</button>
-            <button class="btn mp3" id="mp3Btn" onclick="startDownload('mp3')">🎵 გადმოწერე მაღალი ხარისხის MP3</button>
-        </div>
-    </div>
+function bindDownload(id, url, type, format_id, has_audio){
+  const btn = document.getElementById(`btn_${id}`);
+  const status = document.getElementById(`status_${id}`);
+  btn.onclick = async () => {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+    status.textContent = 'მუშავება...';
+    status.className = 'status';
 
-    <script>
-        let savedUrl = "";
-        
-        const serverUrl = window.location.protocol === 'file:' 
-            ? "http://127.0.0.1:5000" 
-            : window.location.origin;
+    try{
+      const res = await fetch(API + '/api/download', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({url, type, format_id, has_audio})
+      });
+      const {task_id, error} = await res.json();
+      if(error){ throw new Error(error); }
 
-        async function analyze() {
-            const url = document.getElementById('url').value;
-            const status = document.getElementById('status');
-            const linksContainer = document.getElementById('links');
-            
-            if(!url) { status.innerText = "გთხოვთ ჩასვათ ბმული!"; return; }
+      await poll(task_id, status);
+      window.location.href = API + `/api/get_file/${task_id}`;
+      status.textContent = 'მზადაა!';
+      status.className = 'status ok';
+    }catch(e){
+      status.textContent = e.message || 'შეცდომა მოხდა';
+      status.className = 'status err';
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'ჩამოტვირთვა';
+    }
+  };
+}
 
-            savedUrl = url;
-            status.innerHTML = "🔄 კოსმოსური ანალიზი...";
-            linksContainer.style.display = 'none';
-            document.getElementById('progressContainer').style.display = 'none';
-            
-            try {
-                const res = await fetch(`${serverUrl}/api/analyze`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url})
-                });
-                const data = await res.json();
-                
-                if(res.ok) {
-                    status.innerHTML = "✨ მზად არის!<br><span style='color:white; font-size:0.9rem;'>" + data.title + "</span>";
-                    linksContainer.style.display = 'flex';
-                } else {
-                    status.innerText = "❌ შეცდომა: " + (data.error || "ვერ მოიძებნა");
-                }
-            } catch (err) {
-                status.innerText = "❌ სერვერთან კავშირი ვერ დამყარდა!";
-            }
+function poll(task_id, status){
+  return new Promise((resolve, reject) => {
+    const iv = setInterval(async () => {
+      try{
+        const res = await fetch(API + `/api/progress/${task_id}`);
+        const data = await res.json();
+        if(data.status === 'completed'){
+          clearInterval(iv);
+          resolve();
+        }else if(data.status === 'failed'){
+          clearInterval(iv);
+          reject(new Error(data.error || 'ჩამოტვირთვა ვერ მოხერხდა'));
         }
+      }catch(e){
+        clearInterval(iv);
+        reject(e);
+      }
+    }, 1500);
+  });
+}
 
-        async function startDownload(type) {
-            const status = document.getElementById('status');
-            const progressContainer = document.getElementById('progressContainer');
-            const progressFill = document.getElementById('progressBarFill');
-            const progressPercent = document.getElementById('progressPercent');
-            const progressState = document.getElementById('progressState');
-            
-            document.getElementById('mp4Btn').disabled = true;
-            document.getElementById('mp3Btn').disabled = true;
-            
-            status.innerHTML = "";
-            progressContainer.style.display = 'block';
-            progressFill.style.width = '0%';
-            progressPercent.innerText = '0%';
-            progressState.innerText = 'სერვერი ემზადება...';
-
-            try {
-                const res = await fetch(`${serverUrl}/api/download`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ url: savedUrl, type: type })
-                });
-                const initData = await res.json();
-                const taskId = initData.task_id;
-
-                const interval = setInterval(async () => {
-                    const progRes = await fetch(`${serverUrl}/api/progress/${taskId}`);
-                    const task = await progRes.json();
-                    
-                    if (task.status === 'downloading' || task.status === 'processing') {
-                        progressState.innerText = 'იტვირთება სერვერზე...';
-                        progressFill.style.width = task.progress + '%';
-                        progressPercent.innerText = task.progress + '%';
-                    } 
-                    else if (task.status === 'completed') {
-                        clearInterval(interval);
-                        progressFill.style.width = '100%';
-                        progressPercent.innerText = '100%';
-                        progressState.innerText = '✨ მზად არის! გადმოაქვს მოწყობილობაზე...';
-                        
-                        window.location.href = `${serverUrl}/api/get_file/${taskId}`;
-                        
-                        setTimeout(() => {
-                            progressContainer.style.display = 'none';
-                            document.getElementById('mp4Btn').disabled = false;
-                            document.getElementById('mp3Btn').disabled = false;
-                            status.innerHTML = "🎉 გადმოწერა წარმატებით დაიწყო!";
-                        }, 2000);
-                    } 
-                    else if (task.status === 'failed') {
-                        clearInterval(interval);
-                        progressContainer.style.display = 'none';
-                        status.innerHTML = `❌ შეცდომა: ${task.error}`;
-                        document.getElementById('mp4Btn').disabled = false;
-                        document.getElementById('mp3Btn').disabled = false;
-                    }
-                }, 600);
-
-            } catch (err) {
-                status.innerHTML = "❌ კავშირის შეცდომა!";
-                document.getElementById('mp4Btn').disabled = false;
-                document.getElementById('mp3Btn').disabled = false;
-            }
-        }
-    </script>
+function escapeHtml(s){
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+</script>
 </body>
 </html>
